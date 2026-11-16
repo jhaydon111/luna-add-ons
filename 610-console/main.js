@@ -160,7 +160,7 @@ function bindSwitchControl(button, control, bindings) {
 }
 
 /** An engraved scale around a knob: `n` ticks over the 300° sweep, with labels when given (ends first). */
-function scaleRing(size, { ticks = 11, labels = [], light = false } = {}) {
+function scaleRing(size, { ticks = 11, labels = [], light = false, offset = 10 } = {}) {
   const pad = labels.length ? 12 : 6;
   const S = size + pad * 2;
   const c = S / 2, r = size / 2 + 3;
@@ -179,7 +179,7 @@ function scaleRing(size, { ticks = 11, labels = [], light = false } = {}) {
     html += `<text x="${(c + (r + 9) * Math.cos(a)).toFixed(1)}" y="${(c + (r + 9) * Math.sin(a) + 2.2).toFixed(1)}" text-anchor="middle">${label}</text>`;
   });
   svg.innerHTML = html;
-  svg.style.top = `${-pad + (size === 72 ? 16 : size >= 60 ? 14 : 10)}px`;
+  svg.style.top = `${-pad + offset}px`;
   return svg;
 }
 
@@ -190,8 +190,8 @@ function makeKnob(classes, label, { stepped = false, scale } = {}) {
   knob.tabIndex = 0;
   knob.setAttribute('aria-label', label);
   knob.innerHTML = '<div class="cap"></div><span class="val"></span>';
-  const size = classes.includes('door') ? 72 : classes.includes('big') ? 64 : classes.includes('small') ? 26 : 34;
-  if (scale) group.append(scaleRing(size, scale));
+  const size = classes.includes('door') ? 66 : classes.includes('big') ? 64 : classes.includes('small') ? 26 : 34;
+  if (scale) group.append(scaleRing(size, { ...scale, offset: classes.includes('door') ? 16 : size >= 60 ? 14 : 10 }));
   group.append(knob, el('div', `klabel${scale?.light ? ' light' : ''}`, label));
   return { group, knob };
 }
@@ -354,6 +354,18 @@ function moduleFor(ch, i, bindings) {
     if (slot?.pluginError?.value) m.append(el('div', 'err', slot.pluginError.value));
   }
 
+  // remove the channel: click once to arm it, again within three seconds to delete the track (one undo step)
+  const remove = el('button', 'remove', 'REMOVE CHANNEL');
+  remove.type = 'button';
+  remove.title = 'Delete this track from the session';
+  let armedAt = 0;
+  remove.onclick = (e) => {
+    e.stopPropagation();
+    if (Date.now() - armedAt < 3000) { remove.disabled = true; AddOnLogic.removeChannel(session, ch).catch((err) => { remove.disabled = false; report(err); }); return; }
+    armedAt = Date.now(); remove.classList.add('sure'); setText(remove, 'SURE? CLICK AGAIN');
+    setTimeout(() => { if (Date.now() - armedAt >= 2900) { remove.classList.remove('sure'); setText(remove, 'REMOVE CHANNEL'); } }, 3000);
+  };
+
   // echo send
   const send = AddOnLogic.echoSend(session, ch);
   if (send) {
@@ -364,6 +376,7 @@ function moduleFor(ch, i, bindings) {
     echo.knob.style.opacity = '.45';
     echo.knob.onclick = () => { echo.knob.onclick = null; AddOnLogic.connectEcho(session, ch).then(() => renderStrips()).catch(report); };
   }
+  m.append(remove);
   return m;
 }
 
@@ -404,7 +417,7 @@ function bindMaster(bindings) {
       vus[1].set(Math.min(1, Math.max(0, levels[streams > 1 ? 1 : 0] ?? 0)));
     }));
     bindings.add(() => vus.forEach((v) => v.stop()));
-    if (!$('monitorKnob').parentElement.querySelector('.ring')) $('monitorKnob').parentElement.prepend(scaleRing(64, { ticks: 11, labels: ['∞', '20', '10', '5', '0'], light: true }));
+    if (!$('monitorKnob').parentElement.querySelector('.ring')) $('monitorKnob').parentElement.prepend(scaleRing(64, { ticks: 11, labels: ['∞', '20', '10', '5', '0'], light: true, offset: 14 }));
     bindKnob($('monitorKnob'), master.gain, bindings, 'Monitor');
   }
   const bus = AddOnLogic.findEchoBus(session);

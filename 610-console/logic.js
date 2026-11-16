@@ -65,6 +65,13 @@ const AddOnLogic = {
     return AddOnLogic.channels(session).find((t) => t.name.value === name) ?? AddOnLogic.channels(session)[before];
   },
 
+  /** Delete a channel's track from the session, one undo step; resolves once it has left the track list. */
+  async removeChannel(session, ch) {
+    if (!(ch instanceof Luna.Track)) throw new Error('Only tracks can be removed here.');
+    await session.deleteTracks([ch.id]);
+    await Luna.settle(() => !session.visibleTracks.includes(ch), 'remove channel', { refresh: () => session.tracks.reload() });
+  },
+
   /** LUNA's focused track id, or null. */
   focusedId(session) {
     return session.context?.lastSelectedTrack?.value ?? null;

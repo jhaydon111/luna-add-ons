@@ -47,6 +47,15 @@ describe('channels', () => {
     expect(req.data).toMatchObject({ name: 'Ch 2', track_type: 'audio', stem_format: 'mono' });
   });
 
+  it('removes a channel by deleting its track', async () => {
+    const { engine, session } = await connected();
+    const bass = L.channels(session)[1];
+    await L.removeChannel(session, bass);
+    await engine.settled();
+    expect(L.channels(session).map((t) => t.name.value)).toEqual(['Vocal', 'Drums']);
+    expect(engine.requests.some((r) => r.path.endsWith('/delete_tracks'))).toBe(true);
+  });
+
   it('focuses a channel in LUNA', async () => {
     const { engine, session } = await connected();
     const bass = L.channels(session)[1];

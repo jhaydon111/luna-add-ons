@@ -31,7 +31,7 @@ A channel is one of the session's first eight audio tracks. **+ Add channel** ad
   - **ECHO** sends the channel to the Echo bus. The first click builds the bus: a stereo aux named Echo with
     Capitol Chambers, fully wet; then the knob is the send level.
 - Click a module to make it LUNA's focused track; the lit module follows LUNA's selection. Double-click a
-  name to rename the track.
+  name to rename the track. **REMOVE CHANNEL** at the foot of a module deletes its track (click twice).
 
 ## The 8-track
 
