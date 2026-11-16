@@ -197,6 +197,29 @@ describe('tape machine', () => {
     expect(L.tapeOn(ch)).toBe(false);
   });
 
+  it('cuts in from stopped, punches out, and cuts back in', async () => {
+    const { engine, session } = await connected();
+    const t = session.transport;
+    expect(await L.cutIn(session)).toBe('in');
+    await engine.settled();
+    expect(t.recordEnabled.value).toBe(true);
+    expect(t.playing.value).toBe(true);
+    expect(await L.cutIn(session)).toBe('out');
+    await engine.settled();
+    expect(t.recordEnabled.value).toBe(false);   // the mock ends the pass here; LUNA itself keeps rolling (fact 80)
+    expect(await L.cutIn(session)).toBe('in');   // and in again
+    await engine.settled();
+    expect(t.recordEnabled.value).toBe(true);
+  });
+
+  it('frames the tape lanes on the first minute, at least a minute wide', async () => {
+    const { session } = await connected();
+    const w = L.laneWindow(session);
+    expect(w.start).toBe(0);
+    expect(w.span).toBe(w.end - w.start);
+    expect(session.musical.timeline.seconds(w.end) - session.musical.timeline.seconds(w.start)).toBeGreaterThanOrEqual(60);
+  });
+
   it('counts tape like a 7.5 ips counter and shows min:sec', () => {
     expect(L.counterText(0)).toEqual({ digits: '0000', clock: '00:00.0' });
     expect(L.counterText(90.5)).toEqual({ digits: '0150', clock: '01:30.5' });

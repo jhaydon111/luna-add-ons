@@ -319,6 +319,47 @@ const AddOnLogic = {
     return session.transport.returnToZero();
   },
 
+  /**
+   * CUT IN: drop into record on the READY tracks. Stopped: roll and record from here. Rolling: punch in.
+   * Already recording: punch out and keep rolling (LUNA's record toggle leaves playback running).
+   */
+  async cutIn(session) {
+    const t = session.transport;
+    const recording = t.recordEnabled.value === true;
+    if (recording) { await t.toggleRecord(); return 'out'; }
+    await t.record();
+    return 'in';
+  },
+
+  /**
+   * The tape lanes' window in ticks: around the channels' clips with a little margin, at least a minute wide,
+   * so a take fills the lanes instead of hiding at one edge. With no clips, the first minute from the playhead.
+   */
+  laneWindow(session, minSeconds = 60) {
+    const tl = session.musical?.timeline;
+    const ticksFor = (sec) => (tl && typeof tl.tickAtSeconds === 'function' ? tl.tickAtSeconds(sec) : Luna.TICKS_PER_BEAT * 2 * sec);
+    let first = Infinity, last = -Infinity;
+    for (const track of AddOnLogic.channels(session)) {
+      const lane = session.playlistFor(track);
+      for (const clip of lane?.clips.items ?? []) {
+        const s0 = clip.start.value, s1 = clip.stop.value;
+        if (s0 === undefined || s1 === undefined) continue;
+        first = Math.min(first, s0); last = Math.max(last, s1);
+      }
+    }
+    const tick = session.transport.tick ?? 0;
+    const margin = ticksFor(2);
+    let start, end;
+    if (first === Infinity) { start = Math.max(0, tick - margin); end = start + ticksFor(minSeconds); }
+    else {
+      start = Math.max(0, first - margin); end = last + margin;
+      const span = end - start;
+      if (tick >= start - span && tick <= end + span) { start = Math.max(0, Math.min(start, tick - margin)); end = Math.max(end, tick + margin); }   // the playhead nearby joins the view
+      if (end - start < ticksFor(minSeconds)) end = start + ticksFor(minSeconds);
+    }
+    return { start, end, span: end - start };
+  },
+
   /** The tape counter: a four-digit mechanical count from the playhead's seconds (one digit per 0.6 s, like a 7.5 ips counter), and min:sec. */
   counterText(seconds) {
     const s = Math.max(0, seconds ?? 0);

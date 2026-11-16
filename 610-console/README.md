@@ -35,11 +35,19 @@ A channel is one of the session's first eight audio tracks. **+ Add channel** ad
 
 ## The 8-track
 
-- **REWIND** returns to the arrangement start; **STOP**, **PLAY** and the red **RECORD** button do what LUNA's
-  transport does and follow it. The reels turn while playing; the counter shows a tape count and min:sec.
-- Each track: a VU, **SAFE / READY** (record arm), **REPRO / INPUT** (input monitor; the amber legend means
-  LUNA is monitoring the input even with the switch off), and the input picker.
-- **TAPE ON** puts the Studer A800 tape extension in every channel's tape slot; OFF takes it out.
+The tape machine is a Studer A800, because LUNA's tape extension is UA's A800: a VU bridge across the top, the
+deck plate with the reels, tension arms and head block, the eight tracks on tape below it, and the transport.
+
+- **Lanes**: one per channel, the channel's clips drawn as waveforms on tape, framed around the takes with the
+  playhead in red. They follow LUNA live: a new take appears when it lands.
+- **REWIND** returns to the arrangement start; **STOP** and **PLAY** do what LUNA's transport does and follow it.
+  **REC** is LUNA's record toggle (arms the transport, and rolls when stopped).
+- **CUT IN** drops into record on the READY tracks: stopped, it rolls and records from here; rolling, it punches
+  in; recording, it punches out and keeps rolling. The key lights while recording.
+- Each channel remote: **SAFE / READY** (record arm), **REPRO / INPUT** (input monitor; the red legend means LUNA
+  is monitoring the input even with the switch off), and the input picker.
+- **TAPE ON** puts the Studer A800 tape extension in every channel's tape slot; OFF takes it out. Only then does
+  the machine colour the sound.
 
 Every drag is one undo step in LUNA; Cmd+Z / Cmd+Shift+Z work while the Add On has the keyboard.
 

@@ -14,6 +14,10 @@ let knownInputs = [];
 let inputTrack = null;
 let clockRelease = null;
 let building = Promise.resolve();
+const waveforms = new Luna.Waveforms({ maxPages: 256 });   // one min/max page cache for the tape lanes
+let lanes = [];          // [{ ch, canvas }] in channel order, spare rows have no ch
+let laneScene = null;    // the last gathered clips and ranges; the playhead repaints without refetching
+let laneTicket = 0;
 
 const keep = (u) => releases.push(u);
 const release = () => { for (const u of releases) u(); releases = []; };
@@ -230,7 +234,8 @@ function renderStrips() {
     if (group.busy) { void group.whenIdle(render); return; }   // a drag began while loading: try again after it
     group.clear();
     const vus = $('vus'); const attens = $('attens'); const modules = $('modules'); const tracks = $('tracks');
-    vus.replaceChildren();
+    const tapeVus = $('tapeVus'); const laneHost = $('lanes');
+    vus.replaceChildren(); tapeVus.replaceChildren(); laneHost.replaceChildren(); lanes = []; laneScene = null;
     attens.replaceChildren(attens.firstElementChild);
     modules.replaceChildren(modules.firstElementChild);
     tracks.replaceChildren();
@@ -238,11 +243,19 @@ function renderStrips() {
       const ch = list[i];
       const vu = makeVu(i + 1);
       vus.append(vu.el);
+      const tvu = makeVu(i + 1, { small: true });
+      tapeVus.append(tvu.el);
+      const row = el('div', `laneRow${ch ? '' : ' spare'}`);
+      const canvas = el('canvas', 'lane'); canvas.width = 1200; canvas.height = 44;
+      row.append(el('div', 'ln', String(i + 1)), canvas);
+      laneHost.append(row);
+      lanes.push({ ch, canvas });
       if (ch) {
         bindVu(vu, ch.meter, group);
+        bindVu(tvu, ch.meter, group);
         attens.append(attenFor(ch, i, group));
         modules.append(moduleFor(ch, i, group));
-        tracks.append(tapeCardFor(ch, i, group, vu));
+        tracks.append(tapeCardFor(ch, i, group));
       } else {
         attens.append(el('div', 'atten'));
         modules.append(el('div', 'module empty', `<div class="plate">NO MODULE</div>`));
@@ -252,6 +265,7 @@ function renderStrips() {
     bindMaster(group);
     paintFocus();
     paintTapeAll();
+    await bindLanes(group, gen);
     $('addChannel').disabled = !AddOnLogic.canAddChannel(session);
   };
   building = group.whenIdle(render).catch(report);
@@ -432,17 +446,13 @@ function bindMaster(bindings) {
 
 // ------------------------------------------------------------------ the tape machine
 
-function tapeCardFor(ch, i, bindings, deskVu) {
+function tapeCardFor(ch, i, bindings) {
   const card = el('div', 'tcard');
   card.append(el('div', 'tn', String(i + 1)));
   const name = el('div', 'tname');
   name.textContent = ch.name.value ?? ch.id;
   bindings.on(ch.name, () => setText(name, ch.name.value ?? ch.id));
   card.append(name);
-  const vu = makeVu(undefined, { small: true });
-  vu.el.classList.add('tvu');
-  bindVu(vu, ch.meter, bindings);
-  card.append(vu.el);
   const ready = makeSwitch('ready', ['SAFE', 'READY'], 'Record arm');
   const mon = makeSwitch('mon', ['REPRO', 'INPUT'], 'Input monitor');
   const paint = () => {
@@ -535,6 +545,98 @@ async function openInputMenu(button, track) {
   }) : [el('div', 'note', 'No inputs of this format.')]));
 }
 
+// ------------------------------------------------------------------ the tape lanes
+
+/** Follow the channels' playlists and sources; gather and paint the lanes now and on every change. */
+async function bindLanes(bindings, gen) {
+  if (!session) return;
+  try {
+    await Promise.all([session.musical?.ready?.() ?? Promise.resolve(), session.sources?.load?.() ?? Promise.resolve()]);
+    for (const { ch } of lanes) {
+      if (!ch) continue;
+      const lane = session.playlistFor(ch);
+      if (!lane) continue;
+      await lane.clips.load();
+      bindings.add(lane.clips.onChange(() => scheduleLanes()));
+    }
+    if (session.sources) bindings.add(session.sources.onChange(() => scheduleLanes()));
+  } catch (e) { console.warn('lanes', e); }
+  if (gen !== generation) return;
+  scheduleLanes();
+}
+
+let laneTimer = 0;
+function scheduleLanes() {
+  clearTimeout(laneTimer);
+  laneTimer = setTimeout(() => void drawLanes(), 80);
+}
+
+/** Gather first, then paint in one pass (a half-drawn canvas flashes during playback). */
+async function drawLanes() {
+  const ticket = ++laneTicket;
+  if (!session) { laneScene = null; return; }
+  const tl = session.musical?.timeline;
+  if (!tl) return;
+  const { start, end, span } = AddOnLogic.laneWindow(session);
+  const W = lanes[0]?.canvas.width ?? 1200;
+  const nsPerPixel = Math.max(1, (tl.seconds(end) - tl.seconds(start)) * 1e9 / W);
+  const kind = Luna.kindForScale(nsPerPixel);
+  const rows = [];
+  for (const { ch } of lanes) {
+    const clips = [];
+    const lane = ch ? session.playlistFor(ch) : null;
+    for (const clip of lane?.clips.items ?? []) {
+      const s0 = clip.start.value, s1 = clip.stop.value;
+      if (s0 === undefined || s1 === undefined || s1 <= start || s0 >= end) continue;
+      const audio = session.sources && Luna.clipAudio(clip, session.sources);
+      if (!audio) { clips.push({ clip, s0, s1, state: 'outline' }); continue; }
+      try {
+        const from = Math.max(audio.startNs, Luna.audioNsAtTick(tl, clip, audio, Math.max(s0, start)) - Luna.OVERVIEW_PAIR_NS);
+        const to = Math.min(audio.stopNs, Luna.audioNsAtTick(tl, clip, audio, Math.min(s1, end)) + Luna.OVERVIEW_PAIR_NS);
+        const range = await waveforms.range(audio.source, from, Math.max(from, to), kind);
+        if (ticket !== laneTicket) return;
+        clips.push({ clip, s0, s1, audio, range, state: range.count ? 'drawn' : 'outline' });
+      } catch { clips.push({ clip, s0, s1, state: 'outline' }); }
+    }
+    rows.push(clips);
+  }
+  if (ticket !== laneTicket) return;
+  laneScene = { tl, start, end, span, rows };
+  paintLanes();
+}
+
+function paintLanes() {
+  if (!laneScene || !session) return;
+  const { tl, start, span, rows } = laneScene;
+  const tick = session.transport.tick ?? session.transport.location.value?.tick;
+  const gain = (session.context?.waveformZoom?.value ?? 1);
+  lanes.forEach(({ canvas }, i) => {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const x = (t) => (t - start) / span * W;
+    for (const { clip, s0, s1, audio, range, state } of rows[i] ?? []) {
+      const x0 = Math.max(0, x(s0)), x1 = Math.min(W, x(s1));
+      ctx.fillStyle = '#6b4f33';
+      ctx.fillRect(x0, 2, Math.max(1, x1 - x0), H - 4);
+      if (state !== 'drawn') continue;
+      const px0 = Math.floor(x0);
+      try {
+        const cols = Luna.waveformColumns(range, Math.max(0, Math.ceil(x1) - px0), (k) => Luna.audioNsAtTick(tl, clip, audio, start + (px0 + k) / W * span), { gain: gain * 10 ** ((clip.gain?.value ?? 0) / 20) });
+        const waveLanes = Luna.waveformLanes(cols.channels.length, 2, H - 4, 0);
+        ctx.fillStyle = '#d7b57a';
+        ctx.beginPath();
+        cols.channels.forEach((chn, c) => Luna.traceWaveform(ctx, chn, waveLanes[c], px0));
+        ctx.fill();
+      } catch { /* a clip without pages yet stays an outline */ }
+    }
+    if (tick !== undefined && tick >= start) {
+      ctx.fillStyle = '#ff3a2a';
+      ctx.fillRect(Math.min(W - 2, x(tick)), 0, 2, H);
+    }
+  });
+}
+
 // ------------------------------------------------------------------ transport
 
 function bindTransport(s) {
@@ -545,6 +647,7 @@ function bindTransport(s) {
     $('play').classList.toggle('on', playing);
     $('rec').classList.toggle('on', rec.recording);
     $('rec').classList.toggle('armed', rec.armed && !rec.recording);
+    $('cutin').classList.toggle('on', rec.recording);
     document.body.classList.toggle('playing', playing);
     document.body.classList.toggle('recording', rec.recording);
   };
@@ -557,14 +660,15 @@ function bindTransport(s) {
   $('stop').onclick = () => t.stop().catch(report);
   $('rtz').onclick = () => AddOnLogic.returnToZero(s).catch(report);
   $('rec').onclick = () => t.toggleRecord().catch(report);
+  $('cutin').onclick = () => AddOnLogic.cutIn(s).catch(report);
   if (clockRelease) clockRelease();
   const paintCounter = (seconds) => {
     const c = AddOnLogic.counterText(typeof seconds === 'number' ? seconds : t.seconds ?? 0);
-    const wheels = $('counter').children;
-    for (let i = 0; i < 4; i++) setText(wheels[i], c.digits[i]);
-    setText($('clock'), c.clock);
+    setText($('counter'), c.clock);
+    setText($('tapecount'), c.digits);
   };
-  clockRelease = Luna.bindClock($('clock'), t, { render: (v) => paintCounter(typeof v === 'number' ? v : t.seconds) });
+  clockRelease = Luna.bindClock($('counter'), t, { render: (v) => paintCounter(typeof v === 'number' ? v : t.seconds) });
+  keep(t.location.onChange(() => paintLanes()));
   keep(() => { if (clockRelease) clockRelease(); clockRelease = null; });
   paintCounter(t.seconds ?? 0);
 }
