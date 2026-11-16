@@ -107,7 +107,8 @@ function bindVu(vu, meter, bindings) {
 function bindKnob(knob, control, bindings, label) {
   const val = knob.querySelector('.val');
   // a big knob prints its value in its legend line (the scale ring takes the space around it)
-  const legend = knob.classList.contains('big') ? knob.parentElement?.querySelector('.klabel') : null;
+  const ringed = !!knob.parentElement?.querySelector('.ring text');   // a labelled scale ring takes the space under the knob
+  const legend = knob.classList.contains('big') || ringed ? knob.parentElement?.querySelector('.klabel') : null;
   if (legend && !legend.dataset.base) legend.dataset.base = legend.textContent;
   const show = () => {
     const text = control.display.value ?? '';
