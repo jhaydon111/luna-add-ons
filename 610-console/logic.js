@@ -2,17 +2,22 @@
 //
 // The console is Bill Putnam Sr.'s 1960 United Recording desk: eight channels of 610 modules, a doorknob
 // attenuator per channel, a VU bridge, an echo send on every module. Each module here is the UA 610-A plug-in
-// sitting in the track's own console slot, so LUNA's channel really is a 610 channel. The echo is an aux bus
+// in the track's first insert slot, so every channel runs through a 610. The echo is an aux bus
 // named Echo with UA's Capitol Chambers (Putnam built those chambers) and each module's ECHO knob is the
 // track's send to it. The tape machine is the track's record arm, input monitor and input, and LUNA's tape
-// slot with the Studer A800 when the TAPE switch is on.
+// slot with the Studer A800 tape extension when the TAPE switch is on.
+//
+// Slots: the 610-A is an ordinary plug-in, so it lives in an insert slot. LUNA's `console` and `tape` slots
+// accept any plug-in id, but LUNA then treats it as a console or tape extension and asserts when it draws
+// the strip (Rack_LookAndFeelBase GetConsoleModelCustomization, seen 11/15 on adding a track), so only the
+// `_ext` / `_console` extension builds (here uaudio_studer_a800_console) go in those slots.
 //
 // Everything here takes SDK objects and returns plain data or performs an engine action. main.js draws.
 
 const MAX_CHANNELS = 8;
 const PLUGIN_610 = 'uaudio_610_a';
-const SLOT_610 = 'console';
-const PLUGIN_TAPE = 'uaudio_studer_a800';
+const SLOT_610 = 'effect_0';     // the first insert slot; see the note on slots above
+const PLUGIN_TAPE = 'uaudio_studer_a800_console';   // LUNA's tape extension build of the Studer, the only kind the tape slot takes
 const SLOT_TAPE = 'tape';
 const PLUGIN_ECHO = 'uaudio_capitol_chambers';
 const ECHO_BUS = 'Echo';
@@ -79,19 +84,18 @@ const AddOnLogic = {
 
   // ---------------------------------------------------------------- the 610 module
 
-  /** The channel's 610 module when the console slot holds one; needs `ch.effects` loaded. */
+  /** The channel's 610 module: the first insert slot holding a 610-A; needs `ch.effects` loaded. */
   find610(ch) {
-    const slot = ch.effects.byId(SLOT_610);
-    return slot && slot.pluginId.value === PLUGIN_610 ? slot : undefined;
+    return ch.effects.items.find((e) => e.pluginId.value === PLUGIN_610 && /^effect_\d+$/.test(e.id));
   },
 
-  /** Put a 610-A in the console slot when it has none (replacing another console plug-in), and load its controls. */
+  /** Put a 610-A in the first free insert slot when the channel has none, and load its controls. */
   async ensure610(ch) {
     await ch.effects.load();
     let slot = AddOnLogic.find610(ch);
     if (!slot) {
-      slot = ch.effects.byId(SLOT_610);
-      if (!slot) throw new Error(`${ch.name.value ?? 'This channel'} has no console slot.`);
+      slot = ch.effects.items.find((e) => /^effect_\d+$/.test(e.id) && e.isEmpty) ?? ch.effects.byId(SLOT_610);
+      if (!slot) throw new Error(`${ch.name.value ?? 'This channel'} has no free insert slot.`);
       await slot.setPlugin(PLUGIN_610, { timeoutMs: 15000 });
     }
     await slot.controls.load();
@@ -283,7 +287,7 @@ const AddOnLogic = {
     return !!slot && slot.pluginId.value === PLUGIN_TAPE;
   },
 
-  /** Put the Studer in the tape slot, or clear it. */
+  /** Put the Studer tape extension in LUNA's tape slot, or clear it. */
   async setTape(ch, on) {
     await ch.effects.load();
     const slot = ch.effects.byId(SLOT_TAPE);

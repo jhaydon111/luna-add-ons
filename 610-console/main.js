@@ -49,18 +49,31 @@ try { setView(localStorage.getItem('610.view') === 'tape' ? 'tape' : 'console');
 
 // ------------------------------------------------------------------ VU meters
 
-/** A VU face: cream, a black scale arc with the red zone, a needle. Returns the element and a setter. */
+/** The VU law: a dB value's place on the sweep (0..1). Linear in voltage, 0 VU at 71% of the sweep, +3 at the end. */
+const vuPos = (db) => Math.pow(10, db / 20) / Math.pow(10, 3 / 20);
+const VU_SWEEP = 104;   // degrees, centred on 0
+const vuAngle = (f) => -VU_SWEEP / 2 + Math.max(0, Math.min(1.04, f)) * VU_SWEEP;
+
+/** A VU face: cream, the VU scale with its red arc, a needle with a shadow. Returns the element and a setter. */
 function makeVu(number, { small = false } = {}) {
   const vu = el('div', `vu${small ? ' small' : ''}`);
-  vu.innerHTML = `<svg viewBox="0 0 100 56" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M12 46 A 44 44 0 0 1 88 46" fill="none" stroke="#2b2b2b" stroke-width="1.6"/>
-      <path d="M71 23 A 44 44 0 0 1 88 46" fill="none" stroke="#c8322a" stroke-width="3"/>
-      <g fill="#2b2b2b" font-family="Helvetica, Arial" font-size="6.5" font-weight="700" text-anchor="middle">
-        <text x="14" y="42">20</text><text x="24" y="28">10</text><text x="39" y="19">5</text><text x="56" y="16">0</text><text x="74" y="19" fill="#c8322a">+3</text>
-      </g>
-      <text x="50" y="36" font-family="Helvetica, Arial" font-size="7" font-weight="700" fill="#2b2b2b" text-anchor="middle" letter-spacing="2">VU</text>
-      <g class="needle" transform="rotate(-48 50 52)"><line x1="50" y1="52" x2="50" y2="10" stroke="#111" stroke-width="1.4"/></g>
-      <circle cx="50" cy="52" r="3" fill="#111"/>
+  const cx = 50, cy = 60, r = 44;
+  const pt = (f, rr) => { const a = (vuAngle(f) - 90) * Math.PI / 180; return [cx + rr * Math.cos(a), cy + rr * Math.sin(a)]; };
+  const arc = (f0, f1, rr) => { const [x0, y0] = pt(f0, rr); const [x1, y1] = pt(f1, rr); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A ${rr} ${rr} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+  const major = [-20, -10, -7, -5, -3, -2, -1, 0, 1, 2, 3];
+  const ticks = major.map((db) => { const f = vuPos(db); const [x0, y0] = pt(f, r); const [x1, y1] = pt(f, r - (db === 0 ? 7 : 4.5)); const [tx, ty] = pt(f, r + 6);
+    const red = db > 0; const label = db === 0 ? '0' : db > 0 ? `+${db}` : String(-db);
+    return `<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${red ? '#c42d25' : '#2a2520'}" stroke-width="${db === 0 ? 1.4 : 1}"/>` +
+      (small && ![-20, -10, -5, 0, 3].includes(db) ? '' : `<text x="${tx.toFixed(1)}" y="${(ty + 2).toFixed(1)}" fill="${red ? '#c42d25' : '#2a2520'}" font-size="${small ? 5.5 : 6}" font-weight="700" text-anchor="middle" font-family="Helvetica, Arial">${label}</text>`); }).join('');
+  const minor = [-15, -8, -6, -4, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((db) => { const [x0, y0] = pt(vuPos(db), r); const [x1, y1] = pt(vuPos(db), r - 2.5); return `<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${db > 0 ? '#c42d25' : '#2a2520'}" stroke-width=".7"/>`; }).join('');
+  vu.innerHTML = `<svg viewBox="0 0 100 62" aria-hidden="true">
+      <path d="${arc(0, vuPos(0), r)}" fill="none" stroke="#2a2520" stroke-width="1.2"/>
+      <path d="${arc(vuPos(0), 1, r)}" fill="none" stroke="#c42d25" stroke-width="2.6"/>
+      ${minor}${ticks}
+      <text x="50" y="43" font-family="Helvetica, Arial" font-size="7.5" font-weight="700" fill="#2a2520" text-anchor="middle" letter-spacing="2">VU</text>
+      <circle class="lamp" cx="92" cy="8" r="2.4" fill="#5a4a3a"/>
+      <g class="needle" transform="rotate(${vuAngle(0).toFixed(2)} ${cx} ${cy})"><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - r - 2}" stroke="#000" stroke-width="2" opacity=".25" transform="translate(1.2 1.2)"/><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - r - 2}" stroke="#141210" stroke-width="1.3"/></g>
+      <path d="M${cx - 9} 62 Q ${cx} ${cy - 8} ${cx + 9} 62 Z" fill="#141210"/>
     </svg>`;
   if (number !== undefined) vu.append(el('span', 'n', String(number)));
   const needle = vu.querySelector('.needle');
@@ -70,7 +83,7 @@ function makeVu(number, { small = false } = {}) {
   const tick = () => {
     raf = 0;
     shown += (target - shown) * 0.22;             // VU ballistics: a 300 ms-ish swing, overshoot free
-    needle.setAttribute('transform', `rotate(${-48 + Math.max(0, Math.min(1.06, shown)) * 96} 50 52)`);
+    needle.setAttribute('transform', `rotate(${vuAngle(shown).toFixed(2)} ${cx} ${cy})`);
     if (Math.abs(target - shown) > 0.002) raf = requestAnimationFrame(tick);
   };
   const set = (level) => { target = level; if (!raf) raf = requestAnimationFrame(tick); };
@@ -93,11 +106,19 @@ function bindVu(vu, meter, bindings) {
 /** A continuous knob on `control`: drag, keys and double-click reset come from the SDK; the pointer follows LUNA. */
 function bindKnob(knob, control, bindings, label) {
   const val = knob.querySelector('.val');
+  // a big knob prints its value in its legend line (the scale ring takes the space around it)
+  const legend = knob.classList.contains('big') ? knob.parentElement?.querySelector('.klabel') : null;
+  if (legend && !legend.dataset.base) legend.dataset.base = legend.textContent;
+  const show = () => {
+    const text = control.display.value ?? '';
+    if (legend) setText(legend, text ? `${legend.dataset.base} · ${text}` : legend.dataset.base);
+    else if (val) setText(val, text);
+  };
   Luna.bindDrag(knob, control, {
     bindings, label, onError: report, pixelsPerUnit: 220, step: 0.01,
-    render: (v) => { knob.style.setProperty('--turn', `${AddOnLogic.knobTurn(v)}deg`); if (val) setText(val, control.display.value ?? ''); },
+    render: (v) => { knob.style.setProperty('--turn', `${AddOnLogic.knobTurn(v)}deg`); show(); },
   });
-  if (val) bindings.on(control.display, () => setText(val, control.display.value ?? ''));
+  bindings.on(control.display, show);
 }
 
 /** A rotary switch on a discrete control: click steps up, Shift or right-click steps down; the pointer snaps to the step. */
@@ -138,14 +159,40 @@ function bindSwitchControl(button, control, bindings) {
   button.onclick = () => AddOnLogic.stepSwitch(control, 1).catch(report);
 }
 
-function makeKnob(classes, label, { stepped = false } = {}) {
+/** An engraved scale around a knob: `n` ticks over the 300° sweep, with labels when given (ends first). */
+function scaleRing(size, { ticks = 11, labels = [], light = false } = {}) {
+  const pad = labels.length ? 12 : 6;
+  const S = size + pad * 2;
+  const c = S / 2, r = size / 2 + 3;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${S} ${S}`);
+  svg.setAttribute('width', S); svg.setAttribute('height', S);
+  svg.setAttribute('class', `ring${light ? ' light' : ''}`);
+  let html = '';
+  for (let i = 0; i < ticks; i++) {
+    const a = (-150 + (300 * i) / (ticks - 1) - 90) * Math.PI / 180;
+    const len = labels.length && (i % Math.max(1, Math.round((ticks - 1) / (labels.length - 1))) === 0) ? 4 : 2.5;
+    html += `<line class="tick" x1="${(c + r * Math.cos(a)).toFixed(1)}" y1="${(c + r * Math.sin(a)).toFixed(1)}" x2="${(c + (r + len) * Math.cos(a)).toFixed(1)}" y2="${(c + (r + len) * Math.sin(a)).toFixed(1)}"/>`;
+  }
+  labels.forEach((label, k) => {
+    const a = (-150 + (300 * k) / (labels.length - 1) - 90) * Math.PI / 180;
+    html += `<text x="${(c + (r + 9) * Math.cos(a)).toFixed(1)}" y="${(c + (r + 9) * Math.sin(a) + 2.2).toFixed(1)}" text-anchor="middle">${label}</text>`;
+  });
+  svg.innerHTML = html;
+  svg.style.top = `${-pad + (size === 72 ? 16 : size >= 60 ? 14 : 10)}px`;
+  return svg;
+}
+
+function makeKnob(classes, label, { stepped = false, scale } = {}) {
   const group = el('div', 'kgroup');
   const knob = el('div', `knob ${classes}`.trim());
   knob.setAttribute('role', stepped ? 'button' : 'slider');
   knob.tabIndex = 0;
   knob.setAttribute('aria-label', label);
   knob.innerHTML = '<div class="cap"></div><span class="val"></span>';
-  group.append(knob, el('div', 'klabel', label));
+  const size = classes.includes('door') ? 72 : classes.includes('big') ? 64 : classes.includes('small') ? 26 : 34;
+  if (scale) group.append(scaleRing(size, scale));
+  group.append(knob, el('div', `klabel${scale?.light ? ' light' : ''}`, label));
   return { group, knob };
 }
 
@@ -214,9 +261,10 @@ function renderStrips() {
 function attenFor(ch, i, bindings) {
   const a = el('div', 'atten');
   a.append(el('div', 'chno', String(i + 1)));
-  const { knob } = makeKnob('door', '');
+  const { group, knob } = makeKnob('door', '', { scale: { ticks: 21, labels: ['∞', '30', '20', '15', '10', '5', '0'], light: true } });
   knob.setAttribute('aria-label', `Channel ${i + 1} attenuator`);
-  a.append(knob);
+  group.querySelector('.klabel').remove();
+  a.append(group);
   const db = el('div', 'db');
   a.append(db);
   const val = knob.querySelector('.val');
@@ -252,7 +300,9 @@ function moduleFor(ch, i, bindings) {
   for (const p of ch.main.pans) bindings.on(p.normalized, paintLmr);
   lmr.onclick = () => { const next = { L: 'M', M: 'R', R: 'L' }[AddOnLogic.busAssign(ch)]; AddOnLogic.setBusAssign(ch, next).catch(report); };
   m.append(lmr);
-  m.append(el('div', 'plate', '610 · MODULAR AMPLIFIER'));
+  m.append(el('div', 'screws', '<i></i><i></i><i></i><i></i>'));
+  const badge = el('div', 'diamond'); badge.append(el('b', '', '610')); m.append(badge);
+  m.append(el('div', 'plate', 'MODULAR AMPLIFIER'));
 
   const name = el('div', 'name');
   name.textContent = ch.name.value ?? ch.id;
@@ -262,18 +312,18 @@ function moduleFor(ch, i, bindings) {
   m.append(name);
 
   const slot = AddOnLogic.find610(ch);
-  const consoleSlot = ch.effects.byId(AddOnLogic.SLOT_610);
-  if (consoleSlot) {
-    bindings.on(consoleSlot.pluginId, () => void renderStrips());
-    bindings.on(consoleSlot.instanceId, () => { if (AddOnLogic.find610(ch)) void renderStrips(); });
+  for (const e of ch.effects.items) {   // a 610 arriving in, or leaving, any insert slot redraws the module
+    if (!/^effect_\d+$/.test(e.id)) continue;
+    bindings.on(e.pluginId, () => void renderStrips());
+    if (e === slot) bindings.on(e.instanceId, () => { if (AddOnLogic.find610(ch)) void renderStrips(); });
   }
   const c = slot ? AddOnLogic.moduleControls(slot) : {};
   const have = slot && c.level;
   m.classList.toggle('empty', !have);
 
   const pair = el('div', 'pair');
-  const lf = makeKnob('small', 'L.F.', { stepped: true });
-  const hf = makeKnob('small', 'H.F.', { stepped: true });
+  const lf = makeKnob('small', 'L.F.', { stepped: true, scale: { ticks: 3 } });
+  const hf = makeKnob('small', 'H.F.', { stepped: true, scale: { ticks: 4 } });
   pair.append(lf.group, hf.group);
   m.append(pair);
 
@@ -281,11 +331,11 @@ function moduleFor(ch, i, bindings) {
   micLine.append(el('span', 'jacks', '<i></i><i></i>'));
   m.append(micLine);
 
-  const level = makeKnob('big', 'LEVEL');
+  const level = makeKnob('big', 'LEVEL', { scale: { ticks: 11, labels: ['0', '2', '4', '6', '8', '10'] } });
   m.append(level.group);
   const gain = makeSwitch('three', ['LO', 'OFF', 'HI'], 'Gain');
   m.append(gain);
-  const echo = makeKnob('small', 'ECHO');
+  const echo = makeKnob('small', 'ECHO', { scale: { ticks: 7, labels: ['OFF', 'MAX'] } });
   m.append(echo.group);
 
   if (have) {
@@ -298,7 +348,7 @@ function moduleFor(ch, i, bindings) {
   } else {
     const insert = el('button', 'insert', slot ? 'LOADING 610…' : 'INSERT 610');
     insert.type = 'button';
-    insert.title = 'Put a UA 610-A in this channel\'s console slot';
+    insert.title = 'Put a UA 610-A on this channel (first insert slot)';
     insert.onclick = () => { insert.disabled = true; AddOnLogic.ensure610(ch).then(() => renderStrips()).catch((e) => { insert.disabled = false; report(e); }); };
     m.append(insert);
     if (slot?.pluginError?.value) m.append(el('div', 'err', slot.pluginError.value));
@@ -354,10 +404,12 @@ function bindMaster(bindings) {
       vus[1].set(Math.min(1, Math.max(0, levels[streams > 1 ? 1 : 0] ?? 0)));
     }));
     bindings.add(() => vus.forEach((v) => v.stop()));
+    if (!$('monitorKnob').parentElement.querySelector('.ring')) $('monitorKnob').parentElement.prepend(scaleRing(64, { ticks: 11, labels: ['∞', '20', '10', '5', '0'], light: true }));
     bindKnob($('monitorKnob'), master.gain, bindings, 'Monitor');
   }
   const bus = AddOnLogic.findEchoBus(session);
   const echoKnob = $('echoKnob');
+  if (!echoKnob.parentElement.querySelector('.ring')) echoKnob.parentElement.prepend(scaleRing(34, { ticks: 7, labels: ['0', '10'], light: true }));
   echoKnob.style.opacity = bus ? '' : '.45';
   echoKnob.onclick = null;
   if (bus) bindKnob(echoKnob, bus.gain, bindings, 'Echo return');
@@ -494,7 +546,8 @@ function bindTransport(s) {
   if (clockRelease) clockRelease();
   const paintCounter = (seconds) => {
     const c = AddOnLogic.counterText(typeof seconds === 'number' ? seconds : t.seconds ?? 0);
-    setText($('counter'), c.digits);
+    const wheels = $('counter').children;
+    for (let i = 0; i < 4; i++) setText(wheels[i], c.digits[i]);
     setText($('clock'), c.clock);
   };
   clockRelease = Luna.bindClock($('clock'), t, { render: (v) => paintCounter(typeof v === 'number' ? v : t.seconds) });

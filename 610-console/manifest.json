@@ -8,7 +8,7 @@
         "(mic/line, gain, L.F. and H.F. shelves, the big level knob, an echo send), doorknob attenuators, a VU meter bridge, ",
         "and an 8-track tape machine for tracking."
     ],
-    "version": "0.1.0",
+    "version": "0.1.1",
     "manufacturer": "JC Haydon",
     "sdk_version": "0.1.0-alpha.8",
     "min_luna_version": "3.1.1",

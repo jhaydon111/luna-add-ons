@@ -57,14 +57,15 @@ describe('channels', () => {
 });
 
 describe('the 610 module', () => {
-  it('puts a 610-A in the console slot once, and finds it after', async () => {
+  it('puts a 610-A in the first insert slot once, and finds it after', async () => {
     const { engine, session } = await connected();
     const ch = L.channels(session)[0];
     expect(L.find610(ch)).toBeUndefined();
     const slot = await L.ensure610(ch);
     await engine.settled();
-    expect(slot.id).toBe('console');
-    expect(engine.value(`/sessions/abc/tracks/${ch.id}/effects/console`, 'plugin_id')).toBe(L.PLUGIN_610);
+    expect(slot.id).toBe('effect_0');
+    expect(engine.value(`/sessions/abc/tracks/${ch.id}/effects/effect_0`, 'plugin_id')).toBe(L.PLUGIN_610);
+    expect(engine.value(`/sessions/abc/tracks/${ch.id}/effects/console`, 'plugin_id')).toBeNull();   // never the console slot: LUNA asserts on a non-extension there
     const inserts = engine.requests.filter((r) => r.path.endsWith('/set_inserts')).length;
     const again = await L.ensure610(ch);
     expect(again).toBe(L.find610(ch));
@@ -75,7 +76,7 @@ describe('the 610 module', () => {
     const { engine, session } = await connected();
     const ch = L.channels(session)[0];
     const slot = await L.ensure610(ch);
-    const base = `/sessions/abc/tracks/${ch.id}/effects/console/controls`;
+    const base = `/sessions/abc/tracks/${ch.id}/effects/effect_0/controls`;
     addSwitch(engine, `${base}/${L.MODULE.lf}`, ['-6 dB', '0 dB', '+6 dB'], 1);
     addSwitch(engine, `${base}/${L.MODULE.micLine}`, ['Line', 'Mic'], 0);
     await slot.controls.reload();   // the mock grew a control after the first load
@@ -91,7 +92,7 @@ describe('the 610 module', () => {
     const { engine, session } = await connected();
     const ch = L.channels(session)[0];
     const slot = await L.ensure610(ch);
-    const path = `/sessions/abc/tracks/${ch.id}/effects/console/controls/${L.MODULE.hf}`;
+    const path = `/sessions/abc/tracks/${ch.id}/effects/effect_0/controls/${L.MODULE.hf}`;
     addSwitch(engine, path, ['-6 dB', '0 dB', '+3 dB', '+6 dB'], 1);
     await slot.controls.reload();
     const hf = L.moduleControls(slot).hf;
@@ -174,7 +175,7 @@ describe('tape machine', () => {
     expect(L.inputName(ch, inputs)).toBe('In 2');
   });
 
-  it('puts the Studer in the tape slot and takes it out', async () => {
+  it('puts the Studer tape extension in the tape slot and takes it out', async () => {
     const { engine, session } = await connected();
     const ch = L.channels(session)[0];
     expect(L.tapeOn(ch)).toBe(false);
