@@ -1,11 +1,15 @@
 # 610 Console
 
-A LUNA Add On that presents the open session as Bill Putnam Sr.'s 1960 United Recording console: eight channels of
-610 modules with only the controls a 610 had, a doorknob attenuator per channel, a VU meter bridge, an echo send on
-every module, and, for tracking, an 8-track tape machine.
+LUNA as Bill Putnam Sr.'s 1960 United Recording desk, with a Studer A800 8-track for tracking. The desk takes the
+session's first eight audio tracks, in LUNA's order, and follows LUNA live. Each channel is a 610 module with only
+the controls a 610 had (L·M·R bus assign, L.F. and H.F. shelves, MIC/LINE, the gain switch, the big LEVEL knob and an
+ECHO send), driven by a UA 610-A in the track's first insert slot, under a black doorknob attenuator and a VU meter.
+The ECHO knobs feed an Echo bus with Capitol Chambers. The 8-track draws the tracks' takes as waveforms on tape,
+has REC and CUT IN for punching in on the READY tracks, and TAPE ON puts UA's Studer A800 tape extension on every
+channel.
 
-Requires LUNA 3.1.1 or later and the UA 610-A Preamp & EQ plug-in (the echo uses Capitol Chambers, the tape
-machine the Studer A800; each is optional).
+Requires LUNA 3.1.1 or later and the UA 610-A Preamp & EQ plug-in. Capitol Chambers (the echo) and the Studer A800
+tape extension are optional; without them those switches do nothing.
 
 ## Install
 

@@ -4,9 +4,19 @@
     "name": "610 Console",
     "categories": ["Recording", "Mixing & Mastering"],
     "description": [
-        "LUNA as Bill Putnam Sr.'s 1960 United Recording console: eight channels of 610 modules with only the controls a 610 had ",
-        "(mic/line, gain, L.F. and H.F. shelves, the big level knob, an echo send), doorknob attenuators, a VU meter bridge, ",
-        "and an 8-track tape machine for tracking."
+        "LUNA as Bill Putnam Sr.'s 1960 United Recording desk, with a Studer A800 8-track for tracking. ",
+        "The desk takes the session's first eight audio tracks, in LUNA's order, and follows LUNA live: add, remove, rename or reorder tracks ",
+        "in LUNA or on the desk and the strips rebuild. ",
+        "CONSOLE: a VU meter bridge (one per channel, PROGRAM L/R for the master, MONITOR = master fader, ECHO = echo return); ",
+        "a black doorknob attenuator per channel (the track fader, with an OFF/ON toggle = mute); and a 610 module per channel with only the ",
+        "controls a 610 had: L·M·R program bus assign (hard pan), L.F. and H.F. shelving switches, MIC/LINE, a LO/OFF/HI gain switch, ",
+        "the big LEVEL knob and an ECHO send. Each module is a UA 610-A Preamp & EQ in the track's first insert slot; click INSERT 610 to add one. ",
+        "The ECHO knob builds a stereo Echo bus with UA Capitol Chambers on first use, then sets the send level. ",
+        "8-TRACK: a Studer A800 with a VU bridge, reels, head block, eight waveform lanes drawn from the tracks' clips, a red LED counter, ",
+        "REWIND/STOP/PLAY/REC and CUT IN (punch in on the READY tracks, again to punch out and keep rolling). Each channel remote has ",
+        "SAFE/READY (record arm), REPRO/INPUT (input monitor) and an input picker. TAPE ON puts UA's Studer A800 tape extension on every channel; ",
+        "only then does the machine colour the sound. Every knob drag is one undo step in LUNA. ",
+        "Requires LUNA 3.1.1 or later and the UA 610-A plug-in; Capitol Chambers and the Studer A800 are optional."
     ],
     "version": "0.1.1",
     "manufacturer": "JC Haydon",
