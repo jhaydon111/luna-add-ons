@@ -1,0 +1,19 @@
+{
+    "package_name": "610 Console",
+    "id": "com.jhaydon.console_610",
+    "name": "610 Console",
+    "categories": ["Recording", "Mixing & Mastering"],
+    "description": [
+        "LUNA as Bill Putnam Sr.'s 1960 United Recording console: eight channels of 610 modules with only the controls a 610 had ",
+        "(mic/line, gain, L.F. and H.F. shelves, the big level knob, an echo send), doorknob attenuators, a VU meter bridge, ",
+        "and an 8-track tape machine for tracking."
+    ],
+    "version": "0.1.0",
+    "manufacturer": "JC Haydon",
+    "sdk_version": "0.1.0-alpha.8",
+    "min_luna_version": "3.1.1",
+    "engines": ["luna"],
+    "html": "index.html",
+    "icon": "icon.png",
+    "target": "app"
+}

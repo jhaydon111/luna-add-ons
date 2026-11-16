@@ -1,0 +1,4 @@
+node_modules/
+*.lunaaddon
+*.zip
+.DS_Store

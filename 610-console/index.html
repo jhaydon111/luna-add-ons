@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>610 Console</title>
+  <style>
+    /* ------------------------------------------------------------------ tokens
+       The United desk: chipped pale grey-blue painted steel, black bakelite knobs, white legends, oak cheeks,
+       cream VU faces with a red arc. The tape machine: dark grey deck, aluminium reels, a backlit counter. */
+    :root {
+      color-scheme: dark;
+      --panel: #96aab6; --panel-dark: #7f93a0; --panel-light: #a9bbc6; --panel-line: #5c6d78;
+      --module: #1b1b1d; --module-line: #3a3a3e; --legend: #ececec; --legend-dim: #b9b9b9;
+      --oak: #9a6a3c; --oak-dark: #6b4524; --desk: #3a2a1c;
+      --knob: #141414; --knob-hi: #3a3a3a; --knob-pointer: #e8e8e8;
+      --vu-face: #f1e8cf; --vu-ink: #2b2b2b; --vu-red: #c8322a; --vu-lamp: #ffd98a;
+      --deck: #2b2c2e; --deck-dark: #1e1f21; --deck-line: #45474b; --reel: #cfd3d6; --reel-dark: #8d9296; --tape: #4a3a2a;
+      --lcd: #ffb64a; --led: #ff3524; --led-amber: #ffb21e;
+      --mod-w: 118px; --bridge-h: 150px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: #101113; color: var(--legend); font: 12px/1.3 "Helvetica Neue", Helvetica, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    /* ------------------------------------------------------------------ header */
+    .top { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: #17181a; border-bottom: 1px solid #2a2b2e; flex: none; }
+    .top h1 { margin: 0; font: 700 14px/1 "Helvetica Neue", Helvetica, sans-serif; letter-spacing: 3px; }
+    .top h1 small { font-weight: 400; letter-spacing: 1px; color: #9a9a9a; margin-left: 8px; }
+    .views { display: flex; border: 1px solid #3a3b3f; border-radius: 6px; overflow: hidden; }
+    .views button { background: #202125; border: 0; padding: 6px 14px; letter-spacing: 2px; font-size: 11px; color: #aaa; }
+    .views button.on { background: var(--panel); color: #101113; }
+    #status { margin-left: auto; color: #8a8a8a; }
+    #addChannel { background: #2a2b2f; border: 1px solid #45464b; border-radius: 6px; padding: 5px 10px; }
+    #addChannel:disabled { opacity: .35; cursor: default; }
+    body.nosession .desk, body.nosession .deck { visibility: hidden; }
+
+    main { flex: 1; overflow: auto; }
+
+    /* ------------------------------------------------------------------ the desk */
+    .desk { display: grid; grid-template-columns: 26px 1fr 26px; min-width: calc(var(--mod-w) * 8 + 320px); padding: 12px 10px 18px; }
+    .cheek { background: linear-gradient(90deg, var(--oak-dark), var(--oak) 40%, var(--oak-dark)); border-radius: 6px; box-shadow: inset 0 0 8px #0008; }
+    .face { display: flex; flex-direction: column; gap: 0; }
+    .paint { background:
+        repeating-linear-gradient(0deg, #ffffff06 0 1px, #00000010 1px 3px),
+        linear-gradient(180deg, var(--panel-light), var(--panel) 30%, var(--panel-dark)); }
+
+    /* meter bridge */
+    .bridge { display: grid; grid-template-columns: 150px 1fr 170px; align-items: stretch; border: 1px solid var(--panel-line); border-bottom: 0; border-radius: 8px 8px 0 0; padding: 10px 12px; gap: 10px; }
+    .bridge .side { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+    .bridge .side .row { display: flex; gap: 18px; justify-content: center; align-items: flex-end; }
+    .legend { font: 600 8.5px/1 Helvetica, Arial, sans-serif; letter-spacing: 1.5px; color: #13181c; text-align: center; text-transform: uppercase; }
+    .legend.light { color: var(--legend); }
+    .vus { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr 1fr; gap: 6px 10px; }
+    .vu { position: relative; height: 64px; background: var(--vu-face); border: 2px solid #2a2a2a; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 18px #c9a95a55, 0 1px 0 #ffffff33; }
+    .vu svg { width: 100%; height: 100%; display: block; }
+    .vu .n { position: absolute; left: 4px; bottom: 2px; font: 700 9px Helvetica, Arial, sans-serif; color: var(--vu-ink); }
+    .vu.clip::after { content: ''; position: absolute; right: 5px; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--led); box-shadow: 0 0 6px var(--led); }
+    .program { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .program .vu { height: 48px; }
+    .vu.small { height: 48px; }
+
+    /* attenuator row */
+    .attens { display: grid; grid-template-columns: 150px repeat(8, var(--mod-w)) 1fr; align-items: end; border: 1px solid var(--panel-line); border-top: 1px solid #ffffff33; border-bottom: 0; padding: 10px 12px 12px; gap: 0 0; }
+    .atten { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .atten .chno { font: 700 9px Helvetica; color: #13181c; letter-spacing: 1px; }
+    .atten .db { font: 600 9px Menlo, monospace; color: #13181c; min-height: 11px; }
+    .attens .note { color: #2a3338; font-size: 10px; padding: 0 6px 12px; align-self: center; }
+
+    /* module row */
+    .modules { display: grid; grid-template-columns: 150px repeat(8, var(--mod-w)) 1fr; border: 1px solid var(--panel-line); border-top: 1px solid #ffffff33; border-radius: 0 0 8px 8px; padding: 10px 12px 14px; }
+    .modules .master { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding-bottom: 6px; }
+
+    .module { background: linear-gradient(180deg, #232326, var(--module)); border: 1px solid var(--module-line); border-radius: 3px; margin: 0 3px; padding: 8px 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 7px; position: relative; box-shadow: inset 0 1px 0 #ffffff14, 0 1px 2px #0008; cursor: default; min-height: 380px; }
+    .module.focused { outline: 2px solid var(--led-amber); outline-offset: 1px; }
+    .module.empty .knob, .module.empty .switch, .module.empty .lmr { opacity: .35; }
+    .module .plate { font: 600 7.5px/1 Helvetica, Arial, sans-serif; letter-spacing: 1.5px; color: var(--legend-dim); text-align: center; }
+    .module .name { font: 700 10px/1.2 "Marker Felt", "Comic Sans MS", Helvetica, sans-serif; color: #15110c; background: #f0e7d2; padding: 3px 6px; border-radius: 2px; width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .module .name.editing { background: #fff; outline: 2px solid var(--led-amber); }
+    .module .pair { display: flex; gap: 10px; align-items: flex-end; }
+    .module .insert { font-size: 9px; color: var(--led-amber); background: #2b2b2f; border: 1px solid #55555a; border-radius: 3px; padding: 4px 6px; }
+    .module .insert[hidden] { display: none; }
+    .module .err { font-size: 9px; color: #ff8a7a; text-align: center; }
+
+    /* knobs: black bakelite, white pointer, skirt scale. --turn rotates the cap. */
+    .knob { position: relative; width: 34px; height: 34px; border-radius: 50%; cursor: ns-resize; outline: none; touch-action: none;
+      background: radial-gradient(circle at 35% 30%, #4a4a4a, var(--knob) 55%, #000 100%); box-shadow: 0 2px 4px #000a, inset 0 1px 0 #ffffff22; }
+    .knob::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; z-index: -1;
+      background: conic-gradient(from 210deg, #ffffff66 0deg, #ffffff66 300deg, transparent 300deg); -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%, #000 66%, transparent 68%); mask: radial-gradient(circle, transparent 60%, #000 62%, #000 66%, transparent 68%); }
+    .knob .cap { position: absolute; inset: 0; border-radius: 50%; transform: rotate(var(--turn, 0deg)); }
+    .knob .cap::after { content: ''; position: absolute; left: 50%; top: 2px; width: 3px; height: 40%; margin-left: -1.5px; background: var(--knob-pointer); border-radius: 2px; }
+    .knob:focus-visible { box-shadow: 0 0 0 2px var(--led-amber); }
+    .knob.big { width: 62px; height: 62px; }
+    .knob.big .cap::after { width: 4px; margin-left: -2px; }
+    .knob.door { width: 68px; height: 56px; border-radius: 50% / 50%; background: radial-gradient(ellipse at 40% 30%, #505050, var(--knob) 50%, #000 100%); }
+    .knob.door .cap::after { top: 3px; height: 38%; }
+    .knob.door::before { inset: -7px -9px; }
+    .knob.small { width: 26px; height: 26px; }
+    .knob .val { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; font: 600 8px Menlo, monospace; color: var(--legend-dim); white-space: nowrap; pointer-events: none; }
+    .knob.stepped { cursor: pointer; }
+    .klabel { font: 600 8px/1 Helvetica, Arial, sans-serif; letter-spacing: 1.2px; color: var(--legend-dim); text-align: center; margin-top: 12px; }
+    .kgroup { display: flex; flex-direction: column; align-items: center; }
+
+    /* bakelite toggles */
+    .switch { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 0; }
+    .switch .lever { width: 14px; height: 26px; border-radius: 7px; background: linear-gradient(90deg, #2a2a2a, #6a6a6a 50%, #2a2a2a); border: 1px solid #000; position: relative; box-shadow: 0 1px 2px #000a; }
+    .switch .lever::after { content: ''; position: absolute; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #8a8a8a, #1a1a1a); top: 2px; transition: top .08s; }
+    .switch.on .lever::after, .switch[data-pos="1"] .lever::after { top: 14px; }
+    .switch[data-pos="mid"] .lever::after { top: 8px; }
+    .switch .cap { font: 600 7.5px/1 Helvetica, Arial, sans-serif; letter-spacing: 1px; color: var(--legend-dim); display: flex; gap: 6px; }
+    .switch .cap b { color: var(--legend); }
+    .switch.three .cap { gap: 4px; }
+    .switch.light .cap, .switch.light .cap b { color: #13181c; }
+    .switch .jacks { display: flex; gap: 10px; }
+    .switch .jacks i { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle, #000 35%, #555 40%, #222 60%); display: block; }
+
+    /* ------------------------------------------------------------------ the tape machine */
+    .deck { min-width: 980px; padding: 14px 12px 20px; display: grid; grid-template-columns: 1fr 300px; gap: 14px; }
+    .deck .transportPanel { background: linear-gradient(180deg, #34363a, var(--deck) 40%, var(--deck-dark)); border: 1px solid var(--deck-line); border-radius: 10px; padding: 16px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 14px; box-shadow: inset 0 1px 0 #ffffff12; }
+    .reels { grid-column: 1 / 3; display: flex; justify-content: space-around; align-items: center; height: 230px; position: relative; }
+    .reel { width: 200px; height: 200px; border-radius: 50%; position: relative; background: radial-gradient(circle, #222 0 9%, var(--reel-dark) 9.5% 11%, var(--tape) 11.5% var(--tape-r, 70%), #1a1a1a var(--tape-r, 70%) 72%, var(--reel) 72.5% 100%);
+      box-shadow: 0 4px 10px #000a, inset 0 0 0 1px #0008; animation: spin 1.4s linear infinite; animation-play-state: paused; }
+    .reel.right { --tape-r: 45%; }
+    .reel::before { content: ''; position: absolute; inset: 0; border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--reel) 0 20deg, transparent 20deg 120deg, var(--reel) 120deg 140deg, transparent 140deg 240deg, var(--reel) 240deg 260deg, transparent 260deg 360deg);
+      -webkit-mask: radial-gradient(circle, transparent 40%, #000 41%, #000 72%, transparent 73%); mask: radial-gradient(circle, transparent 40%, #000 41%, #000 72%, transparent 73%); opacity: .85; }
+    .reel::after { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #ddd, #666); }
+    body.playing .reel { animation-play-state: running; }
+    body.recording .reel { animation-duration: 1.4s; }
+    .tapepath { position: absolute; left: 100px; right: 100px; top: 50%; height: 2px; background: var(--tape); margin-top: 96px; }
+    .heads { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 70px); width: 120px; height: 22px; border-radius: 4px; background: linear-gradient(180deg, #666, #333); box-shadow: 0 2px 4px #000a; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .reel { animation: none; } }
+
+    .counterPanel { display: flex; align-items: center; gap: 16px; }
+    .counter { background: #0d0d0f; border: 2px solid #000; border-radius: 4px; padding: 6px 12px; font: 700 30px/1 Menlo, "Courier New", monospace; color: var(--lcd); letter-spacing: 6px; text-shadow: 0 0 8px #ffb64a99; box-shadow: inset 0 2px 8px #000; }
+    .clock { font: 600 14px Menlo, monospace; color: #c9c9c9; letter-spacing: 1px; }
+    .ips { font: 600 9px Helvetica; letter-spacing: 2px; color: #8f9296; }
+    .transport { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+    .tkey { width: 58px; height: 42px; border: 1px solid #000; border-radius: 4px; background: linear-gradient(180deg, #5a5c60, #3a3c40 60%, #2c2e31); color: #ececec; font: 600 9px/1.2 Helvetica, Arial, sans-serif; letter-spacing: 1.5px; box-shadow: 0 3px 0 #111, inset 0 1px 0 #ffffff22; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+    .tkey svg { width: 18px; height: 14px; fill: currentColor; }
+    .tkey:active { transform: translateY(2px); box-shadow: 0 1px 0 #111; }
+    .tkey.on { background: linear-gradient(180deg, #6f7276, #4a4d51); box-shadow: 0 3px 0 #111, inset 0 0 12px #ffffff22; }
+    .tkey.rec { border-radius: 50%; width: 46px; height: 46px; background: radial-gradient(circle at 35% 30%, #ff7a6a, #b8160a 70%); }
+    .tkey.rec.on { box-shadow: 0 0 18px var(--led), 0 3px 0 #111; }
+    .tkey.rec.armed { box-shadow: 0 0 8px #ff352466, 0 3px 0 #111; }
+
+    .tracks { display: flex; flex-direction: column; gap: 6px; }
+    .tcard { display: grid; grid-template-columns: 22px 1fr 60px 44px 44px; align-items: center; gap: 8px; background: linear-gradient(180deg, #34363a, var(--deck)); border: 1px solid var(--deck-line); border-radius: 6px; padding: 6px 8px; min-height: 48px; }
+    .tcard.spare { opacity: .55; justify-items: start; grid-template-columns: 22px 1fr; }
+    .tcard .tn { font: 700 11px Menlo, monospace; color: #9a9ea3; text-align: center; }
+    .tcard .tname { font: 700 11px "Marker Felt", "Comic Sans MS", Helvetica, sans-serif; color: #15110c; background: #f0e7d2; padding: 3px 6px; border-radius: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tcard .tvu { height: 36px; }
+    .tcard .tvu svg { width: 100%; height: 100%; display: block; }
+    .tcard .input { grid-column: 2; background: #1c1d20; border: 1px solid #3b3d41; border-radius: 3px; padding: 2px 6px; font-size: 9px; color: #b0b3b7; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tcard .add { grid-column: 2; background: #1c1d20; border: 1px dashed #55585d; border-radius: 3px; padding: 6px; color: #9a9ea3; font-size: 10px; }
+    .tcard .add:disabled { opacity: .4; cursor: default; }
+    .tcard .switch .cap { font-size: 7px; }
+    .tcard .switch .lever { height: 22px; }
+    .tcard .switch.on .lever::after { top: 10px; }
+    .tcard .switch.ready.on .cap b { color: var(--led); text-shadow: 0 0 6px var(--led); }
+    .tcard .switch.mon.live .cap b { color: var(--led-amber); }
+    .deck .tapeRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 10px; background: var(--deck-dark); border: 1px solid var(--deck-line); border-radius: 6px; }
+    .deck .tapeRow .lbl { font: 600 9px Helvetica; letter-spacing: 2px; color: #8f9296; }
+
+    /* popups */
+    .popup { position: fixed; z-index: 20; min-width: 200px; max-width: 280px; max-height: 300px; overflow: auto; background: #1f2023; border: 1px solid #4a4c51; border-radius: 6px; box-shadow: 0 10px 30px #000c; padding: 6px; }
+    .popup .title { font-size: 10px; color: #9a9ea3; padding: 4px 6px 6px; letter-spacing: 1px; }
+    .popup .items button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 8px; border-radius: 4px; color: #e8e8e8; }
+    .popup .items button:hover { background: #2e3034; }
+    .popup .items button.current { color: var(--led-amber); }
+    .popup .note { padding: 6px 8px; color: #9a9ea3; font-size: 11px; }
+    .toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: #2a1a18; border: 1px solid #a33; color: #ffd0c8; padding: 8px 12px; border-radius: 6px; z-index: 30; max-width: 70%; }
+    .toast[hidden] { display: none; }
+  </style>
+</head>
+<body class="nosession">
+  <header class="top">
+    <h1>610 CONSOLE <small>UNITED RECORDING · 1960</small></h1>
+    <div class="views" role="tablist">
+      <button id="viewConsole" class="on" role="tab" aria-selected="true">CONSOLE</button>
+      <button id="viewTape" role="tab" aria-selected="false">8-TRACK</button>
+    </div>
+    <button id="addChannel" type="button" title="Add a mono audio track as the next channel">+ Add channel</button>
+    <div id="status">connecting…</div>
+  </header>
+
+  <main>
+    <!-- ============================================================ the desk -->
+    <section id="console" class="desk" aria-label="610 console">
+      <div class="cheek"></div>
+      <div class="face">
+        <div class="bridge paint">
+          <div class="side">
+            <div class="row">
+              <div class="kgroup"><div id="monitorKnob" class="knob big" role="slider" tabindex="0" aria-label="Monitor"><div class="cap"></div><span class="val"></span></div><div class="klabel" style="color:#13181c">MONITOR</div></div>
+              <div class="kgroup"><div id="echoKnob" class="knob" role="slider" tabindex="0" aria-label="Echo return"><div class="cap"></div><span class="val"></span></div><div class="klabel" style="color:#13181c">ECHO</div></div>
+            </div>
+          </div>
+          <div class="vus" id="vus"></div>
+          <div class="side">
+            <div class="legend">Program</div>
+            <div class="program" id="program"></div>
+            <div class="legend" style="margin-top:4px">Split program · L · R</div>
+          </div>
+        </div>
+        <div class="attens paint" id="attens"><div class="note legend" style="text-align:left">Attenuators</div></div>
+        <div class="modules paint" id="modules"><div class="master"><div class="legend">Modular amplifiers</div></div></div>
+      </div>
+      <div class="cheek"></div>
+    </section>
+
+    <!-- ============================================================ the tape machine -->
+    <section id="tape" class="deck" aria-label="8-track tape machine" hidden>
+      <div class="transportPanel">
+        <div class="reels">
+          <div class="tapepath"></div>
+          <div class="reel left"></div>
+          <div class="heads"></div>
+          <div class="reel right"></div>
+        </div>
+        <div class="counterPanel">
+          <div class="counter" id="counter">0000</div>
+          <div><div class="clock" id="clock">00:00.0</div><div class="ips">1" · 8 TRACK · 15 IPS</div></div>
+        </div>
+        <div class="transport">
+          <button id="rtz" class="tkey" type="button" title="Rewind to the start"><svg viewBox="0 0 18 14"><path d="M9 7 18 0v14zM0 7l9-7v14z"/></svg>REWIND</button>
+          <button id="stop" class="tkey" type="button" title="Stop"><svg viewBox="0 0 18 14"><rect x="3" y="1" width="12" height="12"/></svg>STOP</button>
+          <button id="play" class="tkey" type="button" title="Play"><svg viewBox="0 0 18 14"><path d="M3 0l13 7-13 7z"/></svg>PLAY</button>
+          <button id="rec" class="tkey rec" type="button" title="Record"><svg viewBox="0 0 18 14"><circle cx="9" cy="7" r="5"/></svg></button>
+        </div>
+      </div>
+      <div>
+        <div class="tracks" id="tracks"></div>
+        <div class="tapeRow"><span class="lbl">TAPE · STUDER A800 IN LUNA'S TAPE SLOT</span>
+          <button id="tapeAll" class="switch" type="button" title="Put the tape machine on every channel"><span class="lever"></span><span class="cap"><b>OFF</b><span>ON</span></span></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="inputMenu" class="popup" hidden role="menu"><div class="title"></div><div class="items"></div></div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="vendor/luna.global.js"></script>
+  <script src="logic.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

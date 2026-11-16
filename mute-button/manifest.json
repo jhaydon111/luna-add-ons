@@ -1,0 +1,16 @@
+{
+    "package_name": "Mute Button",
+    "id": "com.example.mute_button",
+    "name": "Mute Button",
+    "version": "0.1.0",
+    "manufacturer": "JC Haydon",
+    "sdk_version": "0.1.0-alpha.8",
+    "min_luna_version": "1.9.0",
+    "engines": ["luna", "wasm"],
+    "html": "index.html",
+    "target": "window",
+    "floating": true,
+    "show_with_session": false,
+    "width": 420,
+    "height": 300
+}
