@@ -7,6 +7,7 @@ by following the Get started page on [UA Universe](https://universe.uaudio.com/i
 |---|---|---|
 | [`610-console/`](610-console/) | LUNA as Bill Putnam Sr.'s 1960 United Recording 610 console, with an 8-track tape machine for tracking | Add Ons › Apps › 610 Console |
 | [`mute-button/`](mute-button/) | The Get started tutorial: one big button that mutes the selected track | Add Ons › Windows › Mute Button |
+| [`good-better-best/`](good-better-best/) | Good / Better / Best channel chains for vocal, guitar and bass, with Drive, Squeeze and Space macros: Good on UAD Explore FREE, Better and Best on UAD Spark | Add Ons › Windows › Good Better Best |
 
 ## Install
 
