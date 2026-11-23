@@ -64,6 +64,9 @@ turn it.
 - **Off:** removes the chain and the send. The reverb bus stays for other tracks.
 - **Locked tiers:** clicking one names the missing plug-ins and offers "Get with Spark", which
   opens `uaudio.com/spark?utm_source=luna&utm_medium=add_on&utm_campaign=good_better_best`.
+- **Selection:** LUNA applies a control edit to every selected track when the edited one is among
+  them. So before an edit, the Add On selects that track alone if others are selected with it,
+  as clicking it in LUNA would. Otherwise it leaves the selection alone.
 - **Full tracks:** when a track runs out of insert slots, the plug-ins that don't fit are
   reported and the rest still build.
 
@@ -75,7 +78,7 @@ turn it.
 
 ## Develop
 ```sh
-npm install && npm test          # 21 tests on Luna.MockEngine
+npm install && npm test          # 22 tests on Luna.MockEngine
 npx ua-builder serve             # http://localhost:8790/ against a running LUNA
 npx ua-builder install           # link into LUNA: Add Ons > Windows > Good Better Best
 npx ua-builder pack              # .lunaaddon for Universe

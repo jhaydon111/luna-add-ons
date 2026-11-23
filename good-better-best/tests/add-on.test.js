@@ -263,3 +263,21 @@ describe('macro readouts', () => {
     }
   });
 });
+
+describe('selection', () => {
+  it('narrows a multi-track selection to the edited track, and leaves other selections alone', async () => {
+    const { engine, luna, session, vox, gtr } = await connected();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'good');
+    await engine.settled();
+    await session.context.selectionTracks.set([vox.id, gtr.id]);
+    await engine.settled();
+    await logic.setMacro(session, vox, 'space', 0.8);
+    await engine.settled();
+    expect(session.context.selectionTracks.value).toEqual([vox.id]);
+    await session.context.selectionTracks.set([gtr.id]);           // the edited track is not selected
+    await engine.settled();
+    await logic.setMacro(session, vox, 'space', 0.6);
+    await engine.settled();
+    expect(session.context.selectionTracks.value).toEqual([gtr.id]);
+  });
+});

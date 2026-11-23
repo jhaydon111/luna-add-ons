@@ -262,7 +262,21 @@ const AddOnLogic = {
 
   /** A one-shot macro change (keys, double-click reset): one undo step. */
   async setMacro(session, track, key, v) {
+    await AddOnLogic.focusTrack(session, track);
     await session.transaction(`Good Better Best: ${key}`, () => AddOnLogic.writeMacro(session, track, key, v));
+  },
+
+  /**
+   * LUNA applies a control edit to every selected track when the edited one is among them (the
+   * mixer's gang-by-selection). Before editing a track that is selected along with others, select
+   * it alone, as clicking it in LUNA would, so the edit stays on this track. A track that is not
+   * selected edits alone already, so the selection is left as it is then.
+   */
+  async focusTrack(session, track) {
+    try {
+      const sel = session.context.selectionTracks.value ?? [];
+      if (sel.length > 1 && sel.includes(track.id)) await session.context.selectionTracks.set([track.id]);
+    } catch { /* no edit context (older LUNA): nothing to narrow */ }
   },
 
   /** Load the session records (ownership, instruments); call once per session before the rest. */
@@ -359,6 +373,7 @@ const AddOnLogic = {
     const tier = tierOfInstrument(instrument, key);
     if (!tier) throw new Error(`no ${key} tier for ${instrument}`);
     const failures = {};
+    await AddOnLogic.focusTrack(session, track);
     await AddOnLogic.loadOwnership(session);
     await track.effects.load();
     const want = tier.chain.map((s) => s.plugin);
@@ -448,6 +463,7 @@ const AddOnLogic = {
 
   /** Take the tier off the track: its chain inserts and its GBB send. One undo step. */
   async removeTier(session, track) {
+    await AddOnLogic.focusTrack(session, track);
     await track.outputs.load();
     const send = AddOnLogic.gbbSend(session, track);
     await session.transaction('Good Better Best: off', async () => {
@@ -459,6 +475,7 @@ const AddOnLogic = {
 
   /** A/B: bypass (on = false) or restore the chain inserts and mute or unmute the send. One undo step. */
   async setTierIn(session, track, on) {
+    await AddOnLogic.focusTrack(session, track);
     await track.outputs.load();
     const send = AddOnLogic.gbbSend(session, track);
     if (send) await send.controls.load();

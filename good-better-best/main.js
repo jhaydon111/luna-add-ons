@@ -65,6 +65,9 @@ function paintKnob(knob, macro, v) {
 
 function makeKnob(track, tier, macro, chips) {
   const knob = el('div', 'knob');
+  // Capture phase: runs before bindGesture's pointerdown touches the controls, and the socket
+  // keeps the order, so LUNA sees the narrowed selection before the touch.
+  knob.addEventListener('pointerdown', () => { void AddOnLogic.focusTrack(session, track); }, { capture: true });
   knob.tabIndex = 0;
   knob.setAttribute('role', 'slider');
   knob.setAttribute('aria-label', macro.label);
