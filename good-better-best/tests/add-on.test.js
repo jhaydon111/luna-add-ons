@@ -452,6 +452,11 @@ describe('blind shootout', () => {
 });
 
 describe('tracks built before the EQ', () => {
+  it('a track without a tier never needs one', async () => {
+    const { session, synth } = await connected();
+    expect(logic.needsEq(session, synth)).toBe(false);
+  });
+
   it('still count as their tier without LUNA Channel, and re-applying adds it', async () => {
     const { engine, luna, session, vox } = await connected();
     await logic.applyTier(session, luna.plugins, vox, 'vocal', 'better');
@@ -461,8 +466,10 @@ describe('tracks built before the EQ', () => {
     await vox.effects.load();
     expect(logic.eqSlot(session, vox)).toBeUndefined();
     expect(logic.tierOf(session, vox)).toBe('better');
+    expect(logic.needsEq(session, vox)).toBe(true);
     await logic.applyTier(session, luna.plugins, vox, 'vocal', 'better');
     await engine.settled();
     expect(logic.eqSlot(session, vox)).toBeTruthy();
+    expect(logic.needsEq(session, vox)).toBe(false);
   });
 });

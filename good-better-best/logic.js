@@ -373,6 +373,15 @@ const AddOnLogic = {
     return AddOnLogic.chainSlots(session, track).find((s) => s.pluginId.value === P.lunaEq.plugin);
   },
 
+  /**
+   * Whether a track with a tier still needs its LUNA Channel EQ: none on the track, or one whose
+   * starting EQ was never set for this instrument (an add that was interrupted).
+   */
+  needsEq(session, track) {
+    if (!AddOnLogic.tierOf(session, track)) return false;
+    return !AddOnLogic.eqSlot(session, track) || field(session, track, 'eq') !== AddOnLogic.instrumentOf(session, track);
+  },
+
   /** The eight bands as plain values: [{ band, on, type, freq, gain, q, slope, controls }]. Load the slot's controls first. */
   eqBands(slot) {
     const out = [];

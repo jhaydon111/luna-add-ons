@@ -442,12 +442,7 @@ function strip(track, inst, access) {
     s.append(chain);
     const eq = AddOnLogic.eqSlot(session, track);
     if (eq) s.append(eqGraph(track, eq));
-    else {
-      const add = el('button', 'addeq', '+ LUNA EQ');
-      add.title = `Adds LUNA Channel with a ${inst} EQ after the chain; the rest stays as it is`;
-      add.onclick = () => apply(track, inst, current);
-      s.append(add);
-    }
+    else s.append(el('div', 'note', 'Adding LUNA Channel EQ…'));
   }
 
   // Notes: locked tier, failures, building, hints, the Spark nudge.
@@ -606,6 +601,25 @@ async function apply(track, inst, key) {
   }
 }
 
+// LUNA Channel EQ every time: a track with a tier but no EQ (built before 0.6, or an add that was
+// interrupted) gets it, one track at a time so LUNA loads one plug-in set at once. A track that
+// failed is not retried until the window reopens.
+let eqQueue = Promise.resolve();
+const eqTried = new Set();
+function ensureEq() {
+  for (const track of session.visibleTracks) {
+    if (eqTried.has(track.id) || busy.has(track.id) || shoot.has(track.id)) continue;
+    if (!AddOnLogic.needsEq(session, track)) continue;
+    eqTried.add(track.id);
+    const s = session;
+    eqQueue = eqQueue.then(async () => {
+      if (s !== session || !AddOnLogic.needsEq(session, track)) return;
+      const inst = AddOnLogic.instrumentOf(session, track);
+      await apply(track, inst, AddOnLogic.tierOf(session, track));
+    }).catch(() => {});
+  }
+}
+
 // Re-render on anything that changes a strip's structure: tracks, inserts, bypass, sends.
 async function bindTracks() {
   release();
@@ -623,6 +637,7 @@ async function bindTracks() {
     }
   }
   schedule();
+  ensureEq();
 }
 
 async function bindSession() {
@@ -636,6 +651,7 @@ async function bindSession() {
   await session.ready();
   $('status').textContent = session.name.value ?? '';
   await AddOnLogic.loadOwnership(session);
+  eqTried.clear();
   await bindTracks();
 }
 

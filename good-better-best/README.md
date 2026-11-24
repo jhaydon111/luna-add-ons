@@ -47,7 +47,10 @@ get it. Its Equalizer module starts from a setting for the instrument:
 - **Switching tiers:** LUNA Channel stays in its slot when you switch tiers, so your EQ edits
   carry over. The starting EQ goes on again only when the EQ insert is new or the instrument
   changes.
-- **Older tracks:** a track built before the EQ still shows its tier, with **+ LUNA EQ** to add it.
+- **Every time:** a track with Good, Better or Best always gets LUNA Channel, on.
+  - **Older tracks:** tracks built before 0.6, or an add that was interrupted, get it when the
+    window opens. It goes on one track at a time and leaves the rest of the chain alone.
+  - **Failures:** a track that fails isn't retried until the window reopens.
 - **Level matching:** the EQ moves the level by a dB or so, the same in every tier. Level
   matching between tiers holds, but each tier now sits that much off the dry track.
 
@@ -153,7 +156,7 @@ test compares the gear, not the settings.
 
 ## Develop
 ```sh
-npm install && npm test          # 34 tests on Luna.MockEngine
+npm install && npm test          # 35 tests on Luna.MockEngine
 npx ua-builder serve             # http://localhost:8790/ against a running LUNA
 npx ua-builder install           # link into LUNA: Add Ons > Windows > Good Better Best
 npx ua-builder pack              # .lunaaddon for Universe
