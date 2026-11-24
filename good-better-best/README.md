@@ -52,6 +52,34 @@ turn it.
 - **Ranges:** they come from sweeping each parameter's display in LUNA 3.1.2. They are a
   starting point, set without listening, and need tuning by ear.
 
+## Live rings
+Each knob has an inner ring that moves while the song plays and falls to rest when it stops.
+
+| Knob | Inner ring shows |
+|---|---|
+| Squeeze | Gain reduction (orange), averaged across the tier's compressors, read from their own meters |
+| Space | The reverb bus return |
+| Drive / Gain / Weight | The track's output level |
+
+The compressors' meters are the plug-ins' own (`<slot>/meters/<id>`), measured in LUNA 3.1.2:
+- **1176 family and LA-3A:** with the meter switch on GR, the needle rests at 0.70 and falls
+  toward 0.04 as gain reduction grows.
+- **LA-2A:** the same, resting at 0.62.
+- **Distressor:** its `gain_reduction` meter rests at 0 and rises.
+- **Left out:** a compressor switched to VU in its window, the Century's GR meter (it doesn't
+  move) and the VOXBOX compressor (bypassed in Best).
+
+## Blind test
+**Blind** deals the dry track and every tier you have to letters at random (A, B, C, D), and hides
+the tier switch, knobs and chain. Click letters to hear each one, then **Keep** your favourite to
+see which was which. The pick stays on the track. Knob positions carry over between tiers, so the
+test compares the gear, not the settings.
+- **On Explore FREE:** the test is Dry vs Good, and the results say Better and Best join the test
+  with Spark, with "Get with Spark".
+- **Mixer:** the inserts are still visible in LUNA's mixer, so no peeking.
+- **Switch time:** a tier switch takes about 0.5 to 1.4 s while plug-ins load. Each switch is
+  an ordinary undo step.
+
 ## How it behaves
 - **Tier lock:** a tier unlocks when each of its plug-ins is installed and `Plugin.authorized`
   isn't false. When LUNA's catalog changes (a new Spark licence), the window updates without
@@ -69,16 +97,20 @@ turn it.
   as clicking it in LUNA would. Otherwise it leaves the selection alone.
 - **Full tracks:** when a track runs out of insert slots, the plug-ins that don't fit are
   reported and the rest still build.
+- **One edit at a time:** chain edits on a track queue behind each other. In testing,
+  overlapping tier swaps on one track left LUNA unable to load new plug-ins until a restart.
 
 ## Not done yet
 - **Tuning by ear:** the macro ranges were set from the parameters' display readings without
-  listening. Gain matching across tiers is approximate.
+  listening. Gain matching across tiers is approximate, and louder tends to win a blind test. On
+  a mastered-level vocal, the 1176 already pins at Squeeze 0, so its input range is too hot for
+  hot sources.
 - **Locked-tier demo:** there's no bundled before/after audio yet, so a free user can't hear a
   locked tier before subscribing.
 
 ## Develop
 ```sh
-npm install && npm test          # 22 tests on Luna.MockEngine
+npm install && npm test          # 28 tests on Luna.MockEngine
 npx ua-builder serve             # http://localhost:8790/ against a running LUNA
 npx ua-builder install           # link into LUNA: Add Ons > Windows > Good Better Best
 npx ua-builder pack              # .lunaaddon for Universe

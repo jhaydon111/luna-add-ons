@@ -14,6 +14,16 @@ let cardBindings = new Luna.Bindings();   // knob gestures and readout listeners
 const busy = new Map();       // track id -> tier key being applied
 const notes = new Map();      // track id -> failure text from the last apply
 const lockedNote = new Map(); // track id -> tier key whose 'needs Spark' note is showing
+const shoot = new Map();      // track id -> blind test { order, playing, switching, heard, revealed }
+// One chain edit per track at a time: overlapping tier swaps on a track left LUNA unable to load
+// plug-ins until restart (2026-11-23), so every edit from this page queues behind the last.
+const locks = new Map();
+function exclusive(track, fn) {
+  const next = (locks.get(track.id) ?? Promise.resolve()).catch(() => {}).then(fn);
+  locks.set(track.id, next);
+  return next;
+}
+let rings = [];               // live rings of the rendered knobs: { el, read, shown }
 let renderQueued = false;
 const schedule = () => {
   if (renderQueued) return;
@@ -63,6 +73,41 @@ function paintKnob(knob, macro, v) {
   knob.setAttribute('aria-valuenow', String(Math.round(v * 100)));
 }
 
+// ---- live rings -----------------------------------------------------------------------------
+// An inner ring under each knob shows what it is doing while the song plays: Squeeze the gain
+// reduction of its compressors, Space the reverb return, the others the track's output level.
+// One animation-frame loop reads the meters and repaints only rings that moved (meters push about
+// 30 times a second; docs/DRAWING.md). Stopped, the rings fall to rest.
+function paintRings() {
+  const playing = session?.transport.playing.value === true && !document.hidden;
+  for (const r of rings) {
+    const target = playing ? Math.min(1, Math.max(0, r.read())) : 0;
+    const next = target >= r.shown ? target : Math.max(target, r.shown - 0.04);   // fall back gently
+    if (Math.abs(next - r.shown) < 0.005) continue;
+    r.shown = next;
+    r.el.style.strokeDasharray = `${(next * 75).toFixed(2)} 100`;
+    r.el.parentNode.parentNode.classList.toggle('working', next > 0.05);
+  }
+  requestAnimationFrame(paintRings);
+}
+requestAnimationFrame(paintRings);
+
+function liveSource(track, tier, macro) {
+  if (macro.key === 'squeeze') {
+    const grs = AddOnLogic.grMeters(session, track);
+    for (const g of grs) cardBindings.add(g.meter.onChange(() => {}));
+    return { kind: 'gr', read: () => AddOnLogic.squeezeAmount(grs) };
+  }
+  if (macro.key === 'space') {
+    const bus = tier.verb && AddOnLogic.verbBuses(session)[tier.verb.plugin];
+    if (!bus) return undefined;
+    cardBindings.add(bus.meter.onChange(() => {}));
+    return { kind: 'level', read: () => bus.meter.max };
+  }
+  cardBindings.add(track.meter.onChange(() => {}));
+  return { kind: 'level', read: () => track.meter.max };
+}
+
 function makeKnob(track, tier, macro, chips) {
   const knob = el('div', 'knob');
   // Capture phase: runs before bindGesture's pointerdown touches the controls, and the socket
@@ -71,7 +116,15 @@ function makeKnob(track, tier, macro, chips) {
   knob.tabIndex = 0;
   knob.setAttribute('role', 'slider');
   knob.setAttribute('aria-label', macro.label);
-  knob.innerHTML = `<svg viewBox="0 0 64 64"><path class="trk" d="${arcPath(24, 0, ARC)}"/><path class="val"/><circle class="dot" r="4"/><text class="pct" x="32" y="37"></text></svg><div class="label"></div><div class="word"></div>`;
+  const ringD = arcPath(16, 0, ARC);
+  knob.innerHTML = `<svg viewBox="0 0 64 64"><path class="trk" d="${arcPath(24, 0, ARC)}"/><path class="val"/><path class="ringtrk" d="${ringD}"/><path class="ring" pathLength="75" d="${ringD}" style="stroke-dasharray:0 100"/><circle class="dot" r="4"/><text class="pct" x="32" y="37"></text></svg><div class="label"></div><div class="word"></div>`;
+  const live = liveSource(track, tier, macro);
+  if (live) {
+    const ring = knob.querySelector('.ring');
+    ring.classList.add(live.kind);
+    rings.push({ el: ring, read: live.read, shown: 0 });
+    knob.title = live.kind === 'gr' ? 'Inner ring: gain reduction while playing' : macro.key === 'space' ? 'Inner ring: reverb return while playing' : 'Inner ring: track level while playing';
+  } else knob.querySelector('.ringtrk').remove();
   knob.querySelector('.label').textContent = macro.label;
 
   // The chips this macro drives light up while it is hovered or dragged.
@@ -116,7 +169,7 @@ function makeKnob(track, tier, macro, chips) {
   const oneShot = (next) => {
     v = Math.min(1, Math.max(0, next));
     paintKnob(knob, macro, v);
-    AddOnLogic.setMacro(session, track, macro.key, v).catch(fail(track));
+    exclusive(track, () => AddOnLogic.setMacro(session, track, macro.key, v)).catch(fail(track));
   };
   knob.ondblclick = () => oneShot(AddOnLogic.DEFAULT_MACRO);
   knob.onkeydown = (e) => {
@@ -132,6 +185,7 @@ function makeKnob(track, tier, macro, chips) {
 function render() {
   if (!session) return;
   cardBindings.clear();
+  rings = [];
   const root = $('tracks');
   root.innerHTML = '';
   const lockedLabels = [];
@@ -144,6 +198,8 @@ function render() {
     const hasChain = AddOnLogic.chainSlots(session, track).length > 0;
     const off = AddOnLogic.bypassed(session, track);
     const isBusy = busy.has(track.id);
+    const blind = shoot.get(track.id);
+    if (blind) { root.append(blindCard(track, inst, blind, access)); continue; }
 
     const card = el('div', `card ${current ?? 'none'}${off ? ' bypassed' : ''}`);
     const top = el('div', 'top');
@@ -176,15 +232,21 @@ function render() {
     const offBtn = el('button', 'tier off', 'Off');
     offBtn.classList.toggle('on', !hasChain);
     offBtn.disabled = isBusy || !hasChain;
-    offBtn.onclick = () => AddOnLogic.removeTier(session, track).catch(fail(track));
+    offBtn.onclick = () => exclusive(track, () => AddOnLogic.removeTier(session, track)).catch(fail(track));
     seg.append(offBtn);
     top.append(seg);
+
+    const test = el('button', 'blindbtn', 'Blind');
+    test.title = 'Hear the dry track and each tier you have as A, B, C… without knowing which is which, then pick';
+    test.disabled = isBusy || !access.some((a) => a.unlocked);
+    test.onclick = () => startBlind(track, inst);
+    top.append(test);
 
     const ab = el('button', 'ab', hasChain && off ? 'Dry' : 'A/B');
     ab.title = 'Hear the track without the chain and the reverb, then back';
     ab.disabled = !hasChain || isBusy;
     ab.classList.toggle('on', hasChain && off);
-    ab.onclick = () => AddOnLogic.setTierIn(session, track, off).catch(fail(track));
+    ab.onclick = () => exclusive(track, () => AddOnLogic.setTierIn(session, track, off)).catch(fail(track));
     top.append(ab);
     card.append(top);
 
@@ -237,6 +299,101 @@ function showLocked(detail, a) {
   detail.append(go);
 }
 
+// ---- blind shootout -----------------------------------------------------------------------
+// The dry track and every unlocked tier, dealt to letters at random. The card hides the tier
+// switch, the knobs and the chain while you listen; macro positions carry over between tiers, so
+// it compares the gear, not the settings. Keep a letter to see which was which.
+
+function startBlind(track, inst) {
+  const order = AddOnLogic.dealShootout(AddOnLogic.shootoutContenders(luna.plugins, inst));
+  shoot.set(track.id, { order, playing: null, switching: null, heard: new Set(), revealed: false });
+  lockedNote.delete(track.id);
+  notes.delete(track.id);
+  schedule();
+}
+
+async function listen(track, inst, b, d) {
+  if (b.switching) return;          // one switch at a time, even if a click lands before the re-render
+  b.switching = d.letter;
+  schedule();
+  try {
+    const { failures } = await exclusive(track, () => AddOnLogic.playContender(session, luna.plugins, track, inst, d.key));
+    const bad = Object.keys(failures);
+    if (bad.length) notes.set(track.id, `Could not load: ${bad.join(', ')}`);
+  } catch (e) {
+    notes.set(track.id, e.message ?? String(e));
+  } finally {
+    b.switching = null;
+    b.playing = d.letter;
+    b.heard.add(d.letter);
+    await bindTracks();
+  }
+}
+
+function verdict(inst, key) {
+  if (key === 'dry') return 'You picked the dry track. The chain stays bypassed; press A/B to bring it back.';
+  const t = AddOnLogic.tierOfInstrument(inst, key);
+  return `You picked ${t.label}: ${t.chain[0].name} and friends, from ${t.source}. It stays on the track.`;
+}
+
+function blindCard(track, inst, b, access) {
+  const card = el('div', 'card blind');
+  const top = el('div', 'top');
+  top.append(el('span', 'name', track.name.value), el('span', 'blind-tag', b.revealed ? 'Blind test: results' : 'Blind test'));
+  const close = el('button', 'small', b.revealed ? 'Done' : 'Stop test');
+  close.onclick = () => { shoot.delete(track.id); schedule(); };
+  top.append(close);
+  card.append(top);
+  const foot = el('div', 'blind-foot');
+  const msg = el('span', '');
+  foot.append(msg);
+
+  if (!b.revealed) {
+    const letters = el('div', 'letters');
+    for (const d of b.order) {
+      const btn = el('button', 'letter', d.letter);
+      btn.classList.toggle('on', b.playing === d.letter && !b.switching);
+      btn.classList.toggle('heard', b.heard.has(d.letter));
+      btn.classList.toggle('busy', b.switching === d.letter);
+      btn.disabled = !!b.switching;
+      btn.onclick = () => listen(track, inst, b, d);
+      letters.append(btn);
+    }
+    card.append(letters);
+    const playing = session.transport.playing.value === true;
+    msg.textContent = b.switching ? 'Switching…'
+      : !b.playing ? `Click a letter to hear it${playing ? '' : ' (space plays)'}. One of them is the dry track.`
+      : b.heard.size < b.order.length ? `Listening to ${b.playing}. Try the others.`
+      : 'Heard them all. Keep the one you like best.';
+    const keep = el('button', 'keep small', b.playing ? `Keep ${b.playing}` : 'Keep');
+    keep.disabled = !b.playing || !!b.switching;
+    keep.onclick = () => { b.revealed = true; schedule(); };
+    foot.append(keep);
+  } else {
+    const list = el('div', 'reveal');
+    for (const d of b.order) {
+      const t = d.key === 'dry' ? null : AddOnLogic.tierOfInstrument(inst, d.key);
+      const row = el('div', `rrow ${d.key}${d.letter === b.playing ? ' picked' : ''}`);
+      row.append(el('b', '', d.letter), el('span', 'rtier', t ? t.label : 'Dry'),
+        el('span', 'rchain', t ? t.chain.map((x) => x.name).join(' → ') + (t.verb ? ` · ${t.verb.name}` : '') : 'No chain, no reverb'));
+      if (d.letter === b.playing) row.append(el('span', 'star', '★ your pick'));
+      list.append(row);
+    }
+    card.append(list);
+    const pick = b.order.find((d) => d.letter === b.playing);
+    const locked = access.filter((a) => !a.unlocked).map((a) => a.label);
+    msg.textContent = verdict(inst, pick.key) + (locked.length ? ` ${locked.join(' and ')} sat this one out. ${locked.length > 1 ? 'They join' : 'It joins'} the test with Spark.` : '');
+    if (locked.length) {
+      const go = el('button', 'spark small', 'Get with Spark');
+      go.onclick = openSpark;
+      foot.append(go);
+    }
+  }
+  card.append(foot);
+  if (notes.get(track.id)) { const n = el('div', 'detail warn', notes.get(track.id)); card.append(n); }
+  return card;
+}
+
 const fail = (track) => (e) => { notes.set(track.id, e.message ?? String(e)); schedule(); };
 
 // A new instrument rebuilds the same tier for it when that tier is unlocked; otherwise the old
@@ -247,7 +404,7 @@ async function changeInstrument(track, inst, currentTier) {
   if (!currentTier && !AddOnLogic.chainSlots(session, track).length) return schedule();
   const ok = AddOnLogic.access(luna.plugins, inst).find((a) => a.key === currentTier)?.unlocked;
   if (ok) return apply(track, inst, currentTier);
-  await AddOnLogic.removeTier(session, track).catch(fail(track));
+  await exclusive(track, () => AddOnLogic.removeTier(session, track)).catch(fail(track));
   schedule();
 }
 
@@ -257,7 +414,7 @@ async function apply(track, inst, key) {
   lockedNote.delete(track.id);
   schedule();
   try {
-    const { failures } = await AddOnLogic.applyTier(session, luna.plugins, track, inst, key);
+    const { failures } = await exclusive(track, () => AddOnLogic.applyTier(session, luna.plugins, track, inst, key));
     const bad = Object.entries(failures);
     if (bad.length) notes.set(track.id, `Could not load: ${bad.map(([n, m]) => `${n} (${m})`).join(', ')}`);
   } catch (e) {
@@ -274,6 +431,7 @@ async function bindTracks() {
   await Promise.all(session.visibleTracks.map((t) => t.effects.load().then(() => AddOnLogic.loadMacroControls(session, t))));
   keep(session.tracks.onChange(() => { void bindTracks(); }));
   keep(session.buses.onChange(schedule));
+  keep(session.transport.playing.onChange(schedule));   // rings rest and the blind-test hint follow play/stop
   keep(session.storage.context('com.jhaydon.good_better_best.tracks').records.onChange(schedule));
   for (const track of session.visibleTracks) {
     keep(track.name.onChange(schedule));

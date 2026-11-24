@@ -157,6 +157,24 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const spaceDb = (v) => (v <= 0.01 ? -144 : lerp(-30, -6, v));
 const spaceFromDb = (db) => (db <= -100 ? 0 : clamp01((db + 30) / 24));
 
+// Gain reduction, read from each compressor's own meter (`<slot>/meters/<id>`), for the Squeeze
+// knob's live ring. Measured in LUNA 3.1.2 on 2026-11-23 with a vocal and a bass playing: with the
+// meter switch on GR, the 1176 and LA-3A needles rest at 0.70 and the LA-2A's at 0.62, and fall
+// toward 0.04 (pinned) as gain reduction grows; the Distressor's gain_reduction meter rests at 0
+// and rises (0.63 driven hard). The Century's GR meter and a bypassed VOXBOX compressor do not
+// move, so they are left out.
+const NEEDLE_1176 = { meter: 'vu', rest: 0.7, full: 0.04, grSwitch: true };
+const NEEDLE_LA2A = { meter: 'vu_meter', rest: 0.62, full: 0.04, grSwitch: true };
+const GR_METERS = {
+  uaudio_ua_1176: NEEDLE_1176,
+  uaudio_ua_1176_rev_a: NEEDLE_1176,
+  uaudio_ua_1176ln_rev_e: NEEDLE_1176,
+  'uaudio_teletronix_la-2a_tc': NEEDLE_LA2A,
+  'uaudio_teletronix_la-2a_silver': NEEDLE_LA2A,
+  uaudio_la3a: { meter: 'vu_meter', rest: 0.7, full: 0.04, grSwitch: true },
+  uaudio_distressor: { meter: 'gain_reduction', rest: 0, full: 0.8 },
+};
+
 const instrumentByKey = (key) => INSTRUMENTS.find((i) => i.key === key);
 const tierOfInstrument = (inst, key) => instrumentByKey(inst)?.tiers.find((t) => t.key === key);
 const busName = (verb) => BUS_PREFIX + verb.name;
@@ -183,6 +201,7 @@ const AddOnLogic = {
   tierOfInstrument,
   DEFAULT_MACRO,
   spaceDb,
+  GR_METERS,
 
   /** The instrument's three macros: [{ key, label, words }]. */
   macrosOf(instrument) {
@@ -277,6 +296,79 @@ const AddOnLogic = {
       const sel = session.context.selectionTracks.value ?? [];
       if (sel.length > 1 && sel.includes(track.id)) await session.context.selectionTracks.set([track.id]);
     } catch { /* no edit context (older LUNA): nothing to narrow */ }
+  },
+
+  // ---- live rings --------------------------------------------------------------------------
+
+  /** How hard a compressor is working, 0..1, from its meter level (see GR_METERS). */
+  grAmount(pluginId, level) {
+    const spec = GR_METERS[pluginId];
+    if (!spec || typeof level !== 'number') return 0;
+    return clamp01((spec.rest - level) / (spec.rest - spec.full));
+  },
+
+  /**
+   * The gain-reduction meters of the compressors the Squeeze macro moves on this track:
+   * [{ plugin, meter }]. A needle meter only shows gain reduction with its switch on GR, so a
+   * compressor switched to VU in its window is left out. Load the slots' controls first.
+   */
+  grMeters(session, track) {
+    const ctx = AddOnLogic.macroContext(session, track);
+    if (!ctx) return [];
+    const plugins = [...new Set((ctx.tier.macros.squeeze ?? []).filter((m) => !m.send).map((m) => m.plugin))];
+    return plugins.flatMap((plugin) => {
+      const spec = GR_METERS[plugin];
+      const slot = ctx.slots[plugin];
+      if (!spec || !slot) return [];
+      const sw = slot.controls.byId('meter')?.display.value;
+      if (spec.grSwitch && sw !== undefined && sw.trim() !== 'GR') return [];
+      return [{ plugin, meter: new Luna.Meter(slot.client, `${slot.path}/meters/${spec.meter}`) }];
+    });
+  },
+
+  /**
+   * The Squeeze ring, 0..1: the compressors' gain reduction averaged, so the ring still moves when
+   * a 1176 pins on a hot source (it did on a mastered vocal, from Squeeze 50 %).
+   */
+  squeezeAmount(grMeters) {
+    if (!grMeters.length) return 0;
+    return grMeters.reduce((a, g) => a + AddOnLogic.grAmount(g.plugin, g.meter.max), 0) / grMeters.length;
+  },
+
+  // ---- blind shootout ----------------------------------------------------------------------
+
+  /** What a blind test compares on this instrument: the dry track and every unlocked tier. */
+  shootoutContenders(plugins, instrument) {
+    return ['dry', ...AddOnLogic.access(plugins, instrument).filter((a) => a.unlocked).map((a) => a.key)];
+  },
+
+  /** Deal the contenders to letters at random: [{ letter, key }]. */
+  dealShootout(contenders, random = Math.random) {
+    const keys = [...contenders];
+    for (let i = keys.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [keys[i], keys[j]] = [keys[j], keys[i]];
+    }
+    return keys.map((key, i) => ({ letter: 'ABCDEFGH'[i], key }));
+  },
+
+  /**
+   * Make the track sound like one contender: 'dry' bypasses the chain (and mutes its send); a
+   * tier builds it if needed, macros carried over, and makes sure every insert is in.
+   */
+  async playContender(session, plugins, track, instrument, key) {
+    if (key === 'dry') {
+      if (AddOnLogic.chainSlots(session, track).length && !AddOnLogic.bypassed(session, track)) await AddOnLogic.setTierIn(session, track, false);
+      return { failures: {} };
+    }
+    let result = { failures: {} };
+    if (AddOnLogic.tierOf(session, track) !== key) result = await AddOnLogic.applyTier(session, plugins, track, instrument, key);
+    await track.effects.load();
+    await track.outputs.load();
+    const send = AddOnLogic.gbbSend(session, track);
+    if (send) await send.controls.load();
+    if (AddOnLogic.chainSlots(session, track).some((s) => !isIn(s)) || send?.mute.on) await AddOnLogic.setTierIn(session, track, true);
+    return result;
   },
 
   /** Load the session records (ownership, instruments); call once per session before the rest. */

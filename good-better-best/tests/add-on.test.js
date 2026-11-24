@@ -281,3 +281,89 @@ describe('selection', () => {
     expect(session.context.selectionTracks.value).toEqual([gtr.id]);
   });
 });
+
+describe('live rings', () => {
+  it('reads gain reduction from needle meters (falling) and the Distressor (rising)', () => {
+    expect(logic.grAmount('uaudio_ua_1176', 0.7)).toBe(0);
+    expect(logic.grAmount('uaudio_ua_1176', 0.04)).toBeCloseTo(1);
+    expect(logic.grAmount('uaudio_teletronix_la-2a_tc', 0.33)).toBeCloseTo(0.5);
+    expect(logic.grAmount('uaudio_distressor', 0)).toBe(0);
+    expect(logic.grAmount('uaudio_distressor', 0.4)).toBeCloseTo(0.5);
+    expect(logic.grAmount('uaudio_neve_1073', 0.3)).toBe(0);          // no GR meter
+  });
+
+  it('every Squeeze macro has at least one compressor it can meter', () => {
+    for (const inst of logic.INSTRUMENTS) {
+      for (const tier of inst.tiers) {
+        const plugins = (tier.macros.squeeze ?? []).filter((m) => !m.send).map((m) => m.plugin);
+        expect(plugins.some((p) => logic.GR_METERS[p]), `${inst.key} ${tier.key}`).toBe(true);
+      }
+    }
+  });
+
+  it("follows the Squeeze compressors' meters on the track, skipping one switched to VU", async () => {
+    const { engine, luna, session, vox } = await connected();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'good');
+    await engine.settled();
+    await addTierParams(engine, session, vox);
+    const ctx = logic.macroContext(session, vox);
+    const meter = (plugin, id, level) => engine.addNode(`${ctx.slots[plugin].path}/meters/${id}`, { properties: { type: 'meter', enabled: true, num_streams: 1, level: [level], peak: [0], clip: [0] } });
+    meter('uaudio_ua_1176', 'vu', 0.7);
+    meter('uaudio_teletronix_la-2a_tc', 'vu_meter', 0.62);
+    const sw = `${ctx.slots['uaudio_teletronix_la-2a_tc'].path}/controls/meter`;
+    engine.addControl(sw, 'parameter', { discrete: true, value: 0.5, real: 0.5, str: 'GR', automatable: false, normalized: 0.5 });
+    await engine.settled();
+    await logic.loadMacroControls(session, vox);
+
+    const grs = logic.grMeters(session, vox);
+    expect(grs.map((g) => g.plugin).sort()).toEqual(['uaudio_teletronix_la-2a_tc', 'uaudio_ua_1176']);
+    const stops = grs.map((g) => g.meter.onChange(() => {}));
+    engine.setValue(`${ctx.slots.uaudio_ua_1176.path}/meters/vu`, 'level', [0.37]);
+    await engine.settled();
+    expect(logic.squeezeAmount(grs)).toBeCloseTo(0.25);            // 1176 half way, LA-2A at rest
+
+    engine.setValue(sw, 'string_value', 'VU');
+    await engine.settled();
+    expect(logic.grMeters(session, vox).map((g) => g.plugin)).toEqual(['uaudio_ua_1176']);
+    stops.forEach((s) => s());
+  });
+});
+
+describe('blind shootout', () => {
+  it('compares the dry track with every unlocked tier', async () => {
+    const free = await connected({ plugins: EXPLORE });
+    expect(logic.shootoutContenders(free.luna.plugins, 'vocal')).toEqual(['dry', 'good']);
+    const spark = await connected();
+    expect(logic.shootoutContenders(spark.luna.plugins, 'vocal')).toEqual(['dry', 'good', 'better', 'best']);
+  });
+
+  it('deals every contender to its own letter', () => {
+    const seq = [0.9, 0.1, 0.5];
+    const dealt = logic.dealShootout(['dry', 'good', 'better', 'best'], () => seq.shift());
+    expect(dealt.map((d) => d.letter)).toEqual(['A', 'B', 'C', 'D']);
+    expect(dealt.map((d) => d.key).sort()).toEqual(['best', 'better', 'dry', 'good']);
+  });
+
+  it('switches between dry and tiers, always ending with the whole chain in', async () => {
+    const { engine, luna, session, vox } = await connected();
+    await logic.playContender(session, luna.plugins, vox, 'vocal', 'best');
+    await engine.settled();
+    expect(logic.tierOf(session, vox)).toBe('best');
+    expect(logic.bypassed(session, vox)).toBe(false);
+
+    await logic.playContender(session, luna.plugins, vox, 'vocal', 'dry');
+    await engine.settled();
+    expect(logic.bypassed(session, vox)).toBe(true);
+
+    // From dry to another tier: kept inserts (LA-2A Silver) come back in with the new ones.
+    await logic.playContender(session, luna.plugins, vox, 'vocal', 'better');
+    await engine.settled();
+    expect(logic.tierOf(session, vox)).toBe('better');
+    expect(logic.chainSlots(session, vox).every(logic.isIn)).toBe(true);
+
+    await logic.playContender(session, luna.plugins, vox, 'vocal', 'dry');
+    await logic.playContender(session, luna.plugins, vox, 'vocal', 'better');
+    await engine.settled();
+    expect(logic.bypassed(session, vox)).toBe(false);
+  });
+});
