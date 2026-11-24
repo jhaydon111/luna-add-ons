@@ -42,6 +42,8 @@ const P = {
   emt140: { plugin: 'uaudio_emt_140', name: 'EMT 140' },
   lex224: { plugin: 'uaudio_lexicon_224', name: 'Lexicon 224' },
   capitol: { plugin: 'uaudio_capitol_chambers', name: 'Capitol Chambers' },
+  // Free with LUNA: the last insert of every tier, its Equalizer module set for the instrument.
+  lunaEq: { plugin: 'uaudio_luna_channel', name: 'LUNA Channel EQ' },
 };
 
 const EXPLORE = 'UAD Explore FREE';
@@ -77,19 +79,19 @@ const INSTRUMENTS = [
     match: /\b(vox|vocals?|voc|lead|bvs?|harmony|harm|choir|singer|verse|chorus)\b/i,
     macros: [MACROS.drive, MACROS.squeeze, MACROS.space],
     tiers: [
-      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.n610a, P.n1176, P.la2a], verb: P.purePlate,
+      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.n610a, P.n1176, P.la2a, P.lunaEq], verb: P.purePlate,
         macros: {
           drive: [M(P.n610a, 'level', 0.38, 0.72), M(P.n610a, 'output', 0.288, 0)],
           squeeze: [M(P.n1176, 'input', 0.154, 0.629), M(P.n1176, 'output', 0.765, 0.607), M(P.la2a, 'peak_reduct', 0.092, 0.408), M(P.la2a, 'gain', 0.213, 0.254, 0.192)],
           space: [SEND],
         } },
-      { key: 'better', label: 'Better', source: SPARK, chain: [P.neve, P.revA, P.silver], verb: P.emt140,
+      { key: 'better', label: 'Better', source: SPARK, chain: [P.neve, P.revA, P.silver, P.lunaEq], verb: P.emt140,
         macros: {
           drive: [M(P.neve, 'output', 0.112, 0.308), M(P.neve, 'line_gain', 0.43, 0.75)],   // readout first: line_gain is stepped
           squeeze: [M(P.revA, 'input', 0.329, 0.65), M(P.revA, 'output', 0.707, 0.6), M(P.silver, 'peak_reduct', 0.181, 0.421), M(P.silver, 'gain', 0.234, 0.303, 0.241)],
           space: [SEND],
         } },
-      { key: 'best', label: 'Best', source: SPARK, chain: [P.voxbox, P.revE, P.silver], verb: P.lex224,
+      { key: 'best', label: 'Best', source: SPARK, chain: [P.voxbox, P.revE, P.silver, P.lunaEq], verb: P.lex224,
         fixed: [F(P.voxbox, 'comp_byp', 0)],                     // two compressors follow; VOXBOX's own comp out
         macros: {
           drive: [M(P.voxbox, 'input', 0.25, 0.65), M(P.voxbox, 'output', 0.693, 0.061), M(P.voxbox, 'hi_peak', 0, 0.35)],
@@ -104,20 +106,20 @@ const INSTRUMENTS = [
     match: /\b(gtrs?|guitars?|gtr\d*|git|elec|rhythm|lead gtr|solo)\b/i,
     macros: [MACROS.gain, MACROS.squeeze, MACROS.space],
     tiers: [
-      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.showtime, P.n610b, P.n1176], verb: P.purePlate,
+      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.showtime, P.n610b, P.n1176, P.lunaEq], verb: P.purePlate,
         macros: {
           drive: [M(P.showtime, 'volume', 0.2, 0.85), M(P.showtime, 'output', 0.937, 0.932)],
           squeeze: [M(P.n1176, 'input', 0.014, 0.142), M(P.n1176, 'output', 0.733, 0.701)],
           space: [SEND],
         } },
-      { key: 'better', label: 'Better', source: SPARK, chain: [P.dream, P.galaxy, P.la3a], verb: P.emt140,
+      { key: 'better', label: 'Better', source: SPARK, chain: [P.dream, P.galaxy, P.la3a, P.lunaEq], verb: P.emt140,
         fixed: [F(P.galaxy, 'feedback', 0.2)],
         macros: {
           drive: [M(P.dream, 'volume', 0.25, 0.85), M(P.dream, 'boost_amount', 0, 0.6), M(P.dream, 'output', 0.824, 0.756)],
           squeeze: [M(P.la3a, 'peak_reduction', 0.405, 0.522), M(P.la3a, 'gain', 0.526, 0.612)],
           space: [SEND, M(P.galaxy, 'echo_vol', 0.05, 0.4)],      // more space brings the tape echo up too
         } },
-      { key: 'best', label: 'Best', source: SPARK, chain: [P.lion, P.neve, P.la3a], verb: P.capitol,
+      { key: 'best', label: 'Best', source: SPARK, chain: [P.lion, P.neve, P.la3a, P.lunaEq], verb: P.capitol,
         macros: {
           drive: [M(P.lion, 'volume_1', 0.3, 0.95), M(P.lion, 'boost_amount', 0.2, 0.6), M(P.lion, 'output', 0.62, 0.672)],
           squeeze: [M(P.la3a, 'peak_reduction', 0.389, 0.529), M(P.la3a, 'gain', 0.513, 0.635, 0.561)],
@@ -131,20 +133,20 @@ const INSTRUMENTS = [
     match: /\b(bass|bs|bass di|sub|low end)\b/i,
     macros: [MACROS.drive, MACROS.squeeze, MACROS.weight],
     tiers: [
-      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.century, P.n1176, P.la2a], verb: null,
+      { key: 'good', label: 'Good', source: EXPLORE, chain: [P.century, P.n1176, P.la2a, P.lunaEq], verb: null,
         macros: {
           drive: [M(P.century, 'level', 0.45, 0.75), M(P.century, 'output', 0.866, 0.24)],
           squeeze: [M(P.century, 'compression', 0, 0.6), M(P.n1176, 'input', 0, 0.651), M(P.n1176, 'output', 0.684, 0.592, 0.578), M(P.la2a, 'peak_reduct', 0, 0.367)],
           weight: [M(P.century, 'low_shelf', 0.45, 0.72)],
         } },
-      { key: 'better', label: 'Better', source: SPARK, chain: [P.pultec, P.revA, P.silver], verb: null,
+      { key: 'better', label: 'Better', source: SPARK, chain: [P.pultec, P.revA, P.silver, P.lunaEq], verb: null,
         fixed: [F(P.pultec, 'low_freq', 0.5)],                   // 60 cps
         macros: {
           drive: [M(P.pultec, 'output', 0.5, 0.68), M(P.silver, 'gain', 0.356, 0.301)],
           squeeze: [M(P.revA, 'input', 0, 0.715), M(P.revA, 'output', 0.72, 0.593, 0.545), M(P.silver, 'peak_reduct', 0, 0.376)],
           weight: [M(P.pultec, 'lf_boost', 0, 0.6)],
         } },
-      { key: 'best', label: 'Best', source: SPARK, chain: [P.neve, P.distressor, P.fatso], verb: null,
+      { key: 'best', label: 'Best', source: SPARK, chain: [P.neve, P.distressor, P.fatso, P.lunaEq], verb: null,
         macros: {
           drive: [M(P.neve, 'output', 0.381, 0.621), M(P.fatso, 'ch1warmth', 0, 0.75), M(P.neve, 'line_gain', 0.43, 0.7)],   // stepped ones after the readout
           squeeze: [M(P.distressor, 'input', 0.196, 0.475), M(P.distressor, 'output', 0.7, 0.63, 0.605)],
@@ -194,6 +196,47 @@ const GR_METERS = {
   uaudio_la3a: { meter: 'vu_meter', rest: 0.7, full: 0.04, grSwitch: true },
   uaudio_distressor: { meter: 'gain_reduction', rest: 0, full: 0.8 },
 };
+
+// ---- LUNA Channel EQ ----------------------------------------------------------------------
+// LUNA Channel is modular: `slot_1` takes the Equalizer module (real value 1), which has eight
+// bands `eq_b1`..`eq_b8`, each with on, type, freq (Hz), gain (dB, +/-20), q and slope (12..48).
+// Read from LUNA 3.1.2 on 2026-11-23. Band types by real value:
+const EQ_TYPES = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut', 'Notch', 'Band Pass', 'Tilt Shelf', 'Flat Tilt', 'All Pass'];
+const EQ_TYPE = Object.fromEntries(EQ_TYPES.map((n, i) => [n, i]));
+const EQ_MODULE = 1;   // slot_1 = Equalizer
+// Starting points per instrument: clear the low end, take out mud, add presence (and air for a
+// vocal, low end for a bass). Applied when the EQ goes on a track or the instrument changes;
+// edits after that are the user's and survive tier switches.
+const B = (band, type, freq, gain = 0, q = 0.707, slope = 12) => ({ band, type: EQ_TYPE[type], freq, gain, q, slope });
+const EQ_PRESETS = {
+  vocal: [B(1, 'Low Cut', 90, 0, 0.707, 24), B(3, 'Bell', 300, -2.5, 1.2), B(5, 'Bell', 3200, 2, 1.0), B(8, 'High Shelf', 12000, 2.5)],
+  guitar: [B(1, 'Low Cut', 90, 0, 0.707, 24), B(3, 'Bell', 400, -2, 1.0), B(5, 'Bell', 2500, 1.5, 1.2), B(7, 'High Cut', 10000, 0, 0.707, 12)],
+  bass: [B(1, 'Low Cut', 35, 0, 0.707, 24), B(2, 'Bell', 90, 2, 1.0), B(3, 'Bell', 250, -2.5, 1.4), B(5, 'Bell', 900, 1.5, 1.2), B(7, 'High Cut', 6000, 0, 0.707, 12)],
+};
+
+// Magnitude in dB of one band at `f` Hz (48 kHz): RBJ biquads for bells, shelves, notch and band
+// pass; Butterworth slopes for the cuts. Tilt and all-pass draw flat.
+const SR = 48000;
+function biquadDb([b0, b1, b2, a0, a1, a2], f) {
+  const w = (2 * Math.PI * f) / SR, c1 = Math.cos(w), s1 = Math.sin(w), c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+  const nr = b0 + b1 * c1 + b2 * c2, ni = -(b1 * s1 + b2 * s2), dr = a0 + a1 * c1 + a2 * c2, di = -(a1 * s1 + a2 * s2);
+  return 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+function bandDb(b, f) {
+  if (!b.on) return 0;
+  const name = EQ_TYPES[b.type];
+  if (name === 'Low Cut' || name === 'High Cut') {
+    const n = (b.slope ?? 12) / 6, r = name === 'Low Cut' ? b.freq / f : f / b.freq;
+    return -10 * Math.log10(1 + r ** (2 * n));
+  }
+  const A = 10 ** ((b.gain ?? 0) / 40), w0 = (2 * Math.PI * b.freq) / SR, cs = Math.cos(w0), al = Math.sin(w0) / (2 * Math.max(0.05, b.q ?? 0.707)), sq = 2 * Math.sqrt(A) * al;
+  if (name === 'Bell') return biquadDb([1 + al * A, -2 * cs, 1 - al * A, 1 + al / A, -2 * cs, 1 - al / A], f);
+  if (name === 'Low Shelf') return biquadDb([A * ((A + 1) - (A - 1) * cs + sq), 2 * A * ((A - 1) - (A + 1) * cs), A * ((A + 1) - (A - 1) * cs - sq), (A + 1) + (A - 1) * cs + sq, -2 * ((A - 1) + (A + 1) * cs), (A + 1) + (A - 1) * cs - sq], f);
+  if (name === 'High Shelf') return biquadDb([A * ((A + 1) + (A - 1) * cs + sq), -2 * A * ((A - 1) + (A + 1) * cs), A * ((A + 1) + (A - 1) * cs - sq), (A + 1) - (A - 1) * cs + sq, 2 * ((A - 1) - (A + 1) * cs), (A + 1) - (A - 1) * cs - sq], f);
+  if (name === 'Notch') return biquadDb([1, -2 * cs, 1, 1 + al, -2 * cs, 1 - al], f);
+  if (name === 'Band Pass') return biquadDb([al, 0, -al, 1 + al, -2 * cs, 1 - al], f);
+  return 0;
+}
 
 const instrumentByKey = (key) => INSTRUMENTS.find((i) => i.key === key);
 const tierOfInstrument = (inst, key) => instrumentByKey(inst)?.tiers.find((t) => t.key === key);
@@ -320,6 +363,62 @@ const AddOnLogic = {
     } catch { /* no edit context (older LUNA): nothing to narrow */ }
   },
 
+  // ---- LUNA Channel EQ ----------------------------------------------------------------------
+
+  EQ_PRESETS,
+  EQ_TYPES,
+
+  /** The track's LUNA Channel EQ insert (one this Add On placed), or undefined. */
+  eqSlot(session, track) {
+    return AddOnLogic.chainSlots(session, track).find((s) => s.pluginId.value === P.lunaEq.plugin);
+  },
+
+  /** The eight bands as plain values: [{ band, on, type, freq, gain, q, slope, controls }]. Load the slot's controls first. */
+  eqBands(slot) {
+    const out = [];
+    for (let band = 1; band <= 8; band++) {
+      const c = (k) => slot.controls.byId(`eq_b${band}_${k}`);
+      const on = c('on');
+      if (!on) continue;
+      const num = (k) => { const v = c(k)?.real.value; return typeof v === 'number' ? v : Number(v); };
+      out.push({ band, on: on.real.value === true || on.real.value === 1, type: num('type') || 0, freq: num('freq'), gain: num('gain') || 0, q: num('q') || 0.707, slope: num('slope') || 12,
+        controls: { on, type: c('type'), freq: c('freq'), gain: c('gain'), q: c('q') } });
+    }
+    return out;
+  },
+
+  /** The summed EQ curve in dB at each frequency. */
+  eqResponse(bands, freqs) {
+    return freqs.map((f) => bands.reduce((a, b) => a + bandDb(b, f), 0));
+  },
+
+  /** One band's response at `f`, for drawing its dot on the curve. */
+  bandDb,
+
+  /** Whether the band's gain means anything (bells and shelves); cuts only move in frequency. */
+  bandHasGain(b) {
+    return ['Bell', 'Low Shelf', 'High Shelf', 'Tilt Shelf', 'Flat Tilt'].includes(EQ_TYPES[b.type]);
+  },
+
+  /** Put the instrument's starting EQ on the LUNA Channel: the Equalizer module, preset bands on, the rest off. */
+  async applyEqPreset(slot, instrument) {
+    const preset = EQ_PRESETS[instrument];
+    if (!preset) return;
+    await slot.controls.load();
+    const set = async (id, v) => { const c = slot.controls.byId(id); if (c && c.real.value !== v) await c.real.set(v); };
+    await set('slot_1', EQ_MODULE);
+    for (let band = 1; band <= 8; band++) {
+      const b = preset.find((x) => x.band === band);
+      if (!b) { await set(`eq_b${band}_on`, false); continue; }
+      await set(`eq_b${band}_type`, b.type);
+      await set(`eq_b${band}_slope`, b.slope);
+      await set(`eq_b${band}_freq`, b.freq);
+      await set(`eq_b${band}_gain`, b.gain);
+      await set(`eq_b${band}_q`, b.q);
+      await set(`eq_b${band}_on`, true);
+    }
+  },
+
   // ---- live rings --------------------------------------------------------------------------
 
   /** How hard a compressor is working, 0..1, from its meter level (see GR_METERS). */
@@ -440,7 +539,8 @@ const AddOnLogic = {
     const inst = instrumentByKey(AddOnLogic.instrumentOf(session, track));
     if (!inst) return undefined;
     const on = AddOnLogic.chainSlots(session, track).map((s) => s.pluginId.value);
-    return [...inst.tiers].reverse().find((t) => t.chain.every((s) => on.includes(s.plugin)))?.key;
+    // The LUNA Channel EQ does not decide the tier (tracks built before it had none).
+    return [...inst.tiers].reverse().find((t) => t.chain.filter((s) => s.plugin !== P.lunaEq.plugin).every((s) => on.includes(s.plugin)))?.key;
   },
 
   /** The GBB reverb buses in the session, by reverb plug-in id. */
@@ -560,11 +660,18 @@ const AddOnLogic = {
       failures[tier.verb?.name ?? 'send'] = e.code ?? e.message;
     }
 
-    // 4. Fixed settings and the macros, as one more undo step.
+    // 4. Fixed settings, the macros and (when the EQ is new or the instrument changed) the
+    //    instrument's starting EQ, as one more undo step.
     await AddOnLogic.loadMacroControls(session, track);
     const ctx = AddOnLogic.macroContext(session, track);
     if (ctx) {
       await session.transaction(`Good Better Best: ${tier.label} settings`, async () => {
+        const eq = ctx.slots[P.lunaEq.plugin];
+        const placed = pending.some(([s, target]) => s.plugin === P.lunaEq.plugin && owned[target.id]);
+        if (eq && (placed || field(session, track, 'eq') !== instrument)) {
+          await AddOnLogic.applyEqPreset(eq, instrument);
+          await saveField(session, track, 'eq', instrument);
+        }
         for (const f of tier.fixed ?? []) {
           const c = ctx.slots[f.plugin]?.controls.byId(f.param);
           if (c && c.normalized.value !== f.value) await c.normalized.set(f.value);

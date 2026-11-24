@@ -191,6 +191,105 @@ function makeKnob(track, tier, macro, chips) {
   return row;
 }
 
+// ---- EQ graphic ---------------------------------------------------------------------------
+// The LUNA Channel EQ's curve, drawn from its band controls: drag a band's dot for frequency and
+// gain (Shift-drag for Q; cuts move in frequency only), double-click the graph to open LUNA
+// Channel. It redraws when the bands change in LUNA too.
+const EQW = 140, EQH = 66, FMIN = 20, FMAX = 20000, DBR = 15;
+const LOGR = Math.log10(FMAX / FMIN);
+const xOf = (f) => (Math.log10(Math.min(FMAX, Math.max(FMIN, f)) / FMIN) / LOGR) * EQW;
+const fOf = (x) => FMIN * 10 ** ((Math.min(EQW, Math.max(0, x)) / EQW) * LOGR);
+const yOf = (db) => EQH / 2 - (Math.max(-DBR, Math.min(DBR, db)) / DBR) * (EQH / 2 - 4);
+const FREQS = Array.from({ length: 110 }, (_, i) => FMIN * 10 ** ((i / 109) * LOGR));
+const fmtHz = (f) => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 1 : 2)} kHz` : `${Math.round(f)} Hz`);
+
+function eqGraph(track, slot) {
+  const box = el('div', 'eq');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const grid = [100, 1000, 10000].map((f) => `<line class="g" x1="${xOf(f)}" x2="${xOf(f)}" y1="0" y2="${EQH}"/>`).join('')
+    + [6, -6].map((d) => `<line class="g" x1="0" x2="${EQW}" y1="${yOf(d)}" y2="${yOf(d)}"/>`).join('');
+  box.innerHTML = `<svg viewBox="0 0 ${EQW} ${EQH}" preserveAspectRatio="none">${grid}<line class="zero" x1="0" x2="${EQW}" y1="${EQH / 2}" y2="${EQH / 2}"/><path class="fill"/><path class="curve"/><g class="dots"></g></svg><span class="eqlabel">EQ</span><span class="eqtip"></span>`;
+  const svg = box.firstChild;
+  const fillP = svg.querySelector('.fill');
+  const curveP = svg.querySelector('.curve');
+  const dotsG = svg.querySelector('.dots');
+  const tip = box.querySelector('.eqtip');
+  let dragging = null;
+
+  const describe = (b) => `B${b.band} ${AddOnLogic.EQ_TYPES[b.type]} ${fmtHz(b.freq)}${AddOnLogic.bandHasGain(b) ? ` ${b.gain > 0 ? '+' : ''}${b.gain.toFixed(1)} dB` : ''}${/Cut/.test(AddOnLogic.EQ_TYPES[b.type]) ? ` ${b.slope} dB/oct` : ` Q ${b.q.toFixed(2)}`}`;
+  const draw = () => {
+    const bands = AddOnLogic.eqBands(slot);
+    const on = bands.filter((b) => b.on);
+    const ys = AddOnLogic.eqResponse(on, FREQS).map(yOf);
+    const pts = FREQS.map((f, i) => `${xOf(f).toFixed(1)},${ys[i].toFixed(1)}`);
+    curveP.setAttribute('d', `M${pts.join('L')}`);
+    fillP.setAttribute('d', `M0,${EQH / 2}L${pts.join('L')}L${EQW},${EQH / 2}Z`);
+    if (dragging) return;   // keep the dragged dot's element alive
+    dotsG.innerHTML = '';
+    for (const b of on) {
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('class', 'band');
+      const cx = xOf(b.freq), cy = AddOnLogic.bandHasGain(b) ? yOf(b.gain) : yOf(AddOnLogic.eqResponse([b], [b.freq])[0]);
+      g.innerHTML = `<circle r="6.5" cx="${cx}" cy="${cy}"/><text x="${cx}" y="${cy + 2.6}">${b.band}</text>`;
+      g.onpointerenter = () => { tip.textContent = describe(b); };
+      g.onpointerleave = () => { if (!dragging) tip.textContent = ''; };
+      bindBand(g, b);
+      dotsG.append(g);
+    }
+  };
+
+  // Drag a band: touch its controls for the whole gesture, write once per frame.
+  function bindBand(g, b) {
+    const ctl = b.controls;
+    g.addEventListener('pointerdown', () => { void AddOnLogic.focusTrack(session, track); }, { capture: true });
+    let start = null;
+    let queued = false;
+    let next = {};
+    const gesture = Luna.bindGesture(g, [ctl.freq, ctl.gain, ctl.q].filter(Boolean), {
+      capture: true,
+      bindings: cardBindings,
+      onBegin: (e) => { dragging = b.band; start = { x: e.clientX, y: e.clientY, freq: b.freq, gain: b.gain, q: b.q }; g.classList.add('active'); },
+      onEnd: () => { dragging = null; g.classList.remove('active'); tip.textContent = ''; draw(); },
+    });
+    g.onpointermove = (e) => {
+      if (!gesture.active || !start) return;
+      const r = svg.getBoundingClientRect();
+      const sx = EQW / r.width, sy = EQH / r.height;
+      if (e.shiftKey) next = { q: Math.min(20, Math.max(0.1, start.q * 2 ** ((start.y - e.clientY) * sy / 12))) };
+      else {
+        next = { freq: Math.round(fOf(xOf(start.freq) + (e.clientX - start.x) * sx)) };
+        if (AddOnLogic.bandHasGain(b)) next.gain = Math.round(Math.min(DBR, Math.max(-DBR, start.gain + (start.y - e.clientY) * sy * (DBR / (EQH / 2 - 4)))) * 10) / 10;
+      }
+      Object.assign(b, next);
+      const c = g.querySelector('circle'), t = g.querySelector('text');
+      const cx = xOf(b.freq), cy = AddOnLogic.bandHasGain(b) ? yOf(b.gain) : yOf(AddOnLogic.eqResponse([b], [b.freq])[0]);
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); t.setAttribute('x', cx); t.setAttribute('y', cy + 2.6);
+      tip.textContent = describe(b);
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        if (!gesture.active) return;
+        const w = [];
+        if (next.freq !== undefined && ctl.freq.real.value !== b.freq) w.push(ctl.freq.real.set(b.freq));
+        if (next.gain !== undefined && ctl.gain.real.value !== b.gain) w.push(ctl.gain.real.set(b.gain));
+        if (next.q !== undefined && ctl.q.real.value !== b.q) w.push(ctl.q.real.set(Math.round(b.q * 100) / 100));
+        Promise.all(w).catch(fail(track));
+        draw();
+      });
+    };
+  }
+
+  // Redraw when any band changes in LUNA (one redraw per frame).
+  let pending = false;
+  const redraw = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; draw(); }); };
+  for (const b of AddOnLogic.eqBands(slot)) for (const c of Object.values(b.controls)) if (c) cardBindings.on(c.real, redraw);
+  svg.ondblclick = (e) => { if (e.target.closest('.band')) return; slot.openEditor().catch(fail(track)); };
+  box.title = 'LUNA Channel EQ: drag a band, Shift-drag for Q, double-click to open LUNA Channel';
+  draw();
+  return box;
+}
+
 // ---- meters and fader ---------------------------------------------------------------------
 
 /** A vertical bar: <i> slides by the unlit share and <u> back, so the gradient stays put. */
@@ -334,13 +433,21 @@ function strip(track, inst, access) {
   const chips = [];
   if (tier && !isBusy) {
     const chain = el('div', 'chain');
-    for (const x of [...tier.chain, ...(tier.verb ? [{ plugin: 'send', name: tier.verb.name }] : [])]) {
+    for (const x of [...tier.chain.filter((c) => c.plugin !== 'uaudio_luna_channel'), ...(tier.verb ? [{ plugin: 'send', name: tier.verb.name }] : [])]) {   // the EQ has its own graphic
       const c = el('span', `chip${x.plugin === 'send' ? ' verb' : ''}`, x.name);
       c.dataset.plugin = x.plugin;
       chips.push(c);
       chain.append(c);
     }
     s.append(chain);
+    const eq = AddOnLogic.eqSlot(session, track);
+    if (eq) s.append(eqGraph(track, eq));
+    else {
+      const add = el('button', 'addeq', '+ LUNA EQ');
+      add.title = `Adds LUNA Channel with a ${inst} EQ after the chain; the rest stays as it is`;
+      add.onclick = () => apply(track, inst, current);
+      s.append(add);
+    }
   }
 
   // Notes: locked tier, failures, building, hints, the Spark nudge.

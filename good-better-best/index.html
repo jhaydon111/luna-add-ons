@@ -50,6 +50,21 @@
     .chip.lit { border-color: var(--tier); color: #000; background: var(--tier); }
     .chip.lit::before { color: #000; }
 
+    /* EQ graphic. */
+    .eq { position: relative; height: 70px; background: radial-gradient(ellipse at 50% 120%, color-mix(in srgb, var(--tier) 14%, #121215), #0f0f12 70%); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .eq svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .eq .g { stroke: #24242a; stroke-width: .6; vector-effect: non-scaling-stroke; }
+    .eq .zero { stroke: #3a3a42; stroke-width: .8; vector-effect: non-scaling-stroke; }
+    .eq .fill { fill: color-mix(in srgb, var(--tier) 22%, transparent); }
+    .eq .curve { fill: none; stroke: var(--tier); stroke-width: 1.8; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tier) 70%, transparent)); }
+    .eq .band { cursor: grab; }
+    .eq .band circle { fill: #18181c; stroke: var(--tier); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+    .eq .band text { fill: #ddd; font: 700 7px Menlo, monospace; text-anchor: middle; pointer-events: none; }
+    .eq .band:hover circle, .eq .band.active circle { fill: var(--tier); }
+    .eq .band:hover text, .eq .band.active text { fill: #000; }
+    .addeq { font-size: 11px; border-style: dashed; color: var(--dim); }
+    .eqlabel { position: absolute; left: 5px; top: 3px; font-size: 8.5px; font-weight: 700; color: var(--dim); letter-spacing: .08em; pointer-events: none; }
+    .eqtip { position: absolute; right: 5px; top: 3px; font: 600 8.5px Menlo, monospace; color: #ddd; pointer-events: none; }
     .note { font-size: 11px; color: var(--dim); line-height: 1.35; display: flex; flex-direction: column; gap: 5px; padding: 6px; background: #141417; border-radius: 5px; }
     .note.warn { color: #e0a060; }
     .note.locked, .note.nudge { color: #e8d9a8; background: #221e12; }

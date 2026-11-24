@@ -46,11 +46,15 @@ describe('instruments', () => {
     expect(logic.instrumentOf(session, synth)).toBe('guitar');
   });
 
-  it('every instrument has Good on Explore FREE and Better/Best on Spark, three inserts each', () => {
+  it('every instrument has Good on Explore FREE and Better/Best on Spark: three UAD inserts, then LUNA Channel EQ', () => {
     for (const inst of logic.INSTRUMENTS) {
       expect(inst.tiers.map((t) => t.key)).toEqual(['good', 'better', 'best']);
       expect(inst.tiers.map((t) => t.source)).toEqual(['UAD Explore FREE', 'UAD Spark', 'UAD Spark']);
-      for (const t of inst.tiers) expect(t.chain).toHaveLength(3);
+      for (const t of inst.tiers) {
+        expect(t.chain).toHaveLength(4);
+        expect(t.chain[3].plugin).toBe('uaudio_luna_channel');
+      }
+      expect(logic.EQ_PRESETS[inst.key]?.length).toBeGreaterThan(2);
     }
   });
 });
@@ -283,6 +287,64 @@ describe('selection', () => {
   });
 });
 
+async function addEqControls(engine, slot) {
+  const add = (id, discrete, real, str) => { const path = `${slot.path}/controls/${id}`; if (!engine.has(path)) engine.addControl(path, 'parameter', { discrete, value: 0, real, str, automatable: true, normalized: 0 }); };
+  add('slot_1', true, 0, 'Empty');
+  for (let b = 1; b <= 8; b++) {
+    add(`eq_b${b}_on`, true, b === 1, b === 1 ? 'On' : 'Off');
+    add(`eq_b${b}_type`, true, b === 8 ? 2 : 0, 'Bell');
+    add(`eq_b${b}_slope`, true, 12, '12 dB/oct');
+    add(`eq_b${b}_freq`, false, 1000, '1.00 kHz');
+    add(`eq_b${b}_gain`, false, 0, '0.0 dB');
+    add(`eq_b${b}_q`, false, 0.707, '0.707');
+  }
+  await engine.settled();
+  await slot.controls.load();
+}
+
+describe('LUNA Channel EQ', () => {
+  it('draws bells, shelves and cuts: gain at the centre, half at a shelf corner, -3 dB at a cut', () => {
+    const T = Object.fromEntries(logic.EQ_TYPES.map((n, i) => [n, i]));
+    expect(logic.eqResponse([{ on: true, type: T.Bell, freq: 1000, gain: 4, q: 1 }], [1000])[0]).toBeCloseTo(4, 1);
+    expect(logic.eqResponse([{ on: true, type: T.Bell, freq: 1000, gain: 4, q: 1 }], [50])[0]).toBeCloseTo(0, 1);
+    expect(logic.eqResponse([{ on: true, type: T['High Shelf'], freq: 8000, gain: 6, q: 0.707 }], [8000])[0]).toBeCloseTo(3, 0);
+    expect(logic.eqResponse([{ on: true, type: T['Low Cut'], freq: 100, slope: 24 }], [100])[0]).toBeCloseTo(-3, 0);
+    expect(logic.eqResponse([{ on: false, type: T.Bell, freq: 1000, gain: 9, q: 1 }], [1000])[0]).toBe(0);
+  });
+
+  it("puts the instrument's preset on the Equalizer module and turns the other bands off", async () => {
+    const { engine, luna, session, vox } = await connected();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'good');
+    await engine.settled();
+    const eq = logic.eqSlot(session, vox);
+    expect(eq).toBeTruthy();
+    await addEqControls(engine, eq);
+    await logic.applyEqPreset(eq, 'vocal');
+    await engine.settled();
+    expect(eq.controls.byId('slot_1').real.value).toBe(1);
+    const bands = logic.eqBands(eq);
+    const on = bands.filter((b) => b.on);
+    expect(on.map((b) => b.band)).toEqual(logic.EQ_PRESETS.vocal.map((b) => b.band));
+    expect(on.find((b) => b.band === 5).freq).toBe(3200);
+    expect(on.find((b) => b.band === 3).gain).toBe(-2.5);
+  });
+
+  it('keeps the same LUNA Channel, and the edits on it, when the tier changes', async () => {
+    const { engine, luna, session, vox } = await connected();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'good');
+    await engine.settled();
+    const eq = logic.eqSlot(session, vox);
+    await addEqControls(engine, eq);
+    await eq.controls.byId('eq_b5_gain').real.set(4.5);
+    await engine.settled();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'best');
+    await engine.settled();
+    const after = logic.eqSlot(session, vox);
+    expect(after.id).toBe(eq.id);
+    expect(after.controls.byId('eq_b5_gain').real.value).toBe(4.5);
+  });
+});
+
 describe('mapping bends', () => {
   it('a mapping with a midpoint passes through it at 50 % and stays straight without one', () => {
     expect(logic.mapValue({ lo: 0.2, hi: 0.6 }, 0.5)).toBeCloseTo(0.4);
@@ -386,5 +448,21 @@ describe('blind shootout', () => {
     await logic.playContender(session, luna.plugins, vox, 'vocal', 'better');
     await engine.settled();
     expect(logic.bypassed(session, vox)).toBe(false);
+  });
+});
+
+describe('tracks built before the EQ', () => {
+  it('still count as their tier without LUNA Channel, and re-applying adds it', async () => {
+    const { engine, luna, session, vox } = await connected();
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'better');
+    await engine.settled();
+    await logic.eqSlot(session, vox).clear();
+    await engine.settled();
+    await vox.effects.load();
+    expect(logic.eqSlot(session, vox)).toBeUndefined();
+    expect(logic.tierOf(session, vox)).toBe('better');
+    await logic.applyTier(session, luna.plugins, vox, 'vocal', 'better');
+    await engine.settled();
+    expect(logic.eqSlot(session, vox)).toBeTruthy();
   });
 });

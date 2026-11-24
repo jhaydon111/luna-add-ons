@@ -10,7 +10,7 @@ and a Spark upgrade you can name, see and hear.
 Each track gets an instrument. It's guessed from the track name ("Lead Vox", "Gtr DI", "Bass DI"),
 and the user can change it in the row's picker.
 
-| Instrument | Tier | Channel chain | Reverb send (shared bus, 100 % wet) |
+| Instrument | Tier | Channel chain (then LUNA Channel EQ) | Reverb send (shared bus, 100 % wet) |
 |---|---|---|---|
 | Vocal | Good (Explore FREE) | 610-A → 1176 → LA-2A | Pure Plate |
 | Vocal | Better (Spark) | Neve 1073 → 1176 Rev A → LA-2A Silver | EMT 140 |
@@ -28,6 +28,28 @@ saturation. Changing a track's instrument rebuilds the same tier for the new ins
 unlocked; otherwise it takes the old chain off.
 
 The plug-in ids were read from LUNA 3.1.2's catalog.
+
+## LUNA Channel EQ
+Every tier ends with LUNA Channel, which comes free with LUNA, so Good, Better and Best all
+get it. Its Equalizer module starts from a setting for the instrument:
+
+| Instrument | Starting EQ |
+|---|---|
+| Vocal | Low cut 90 Hz (24 dB/oct), −2.5 dB at 300 Hz, +2 dB at 3.2 kHz, +2.5 dB air shelf at 12 kHz |
+| Guitar | Low cut 90 Hz (24 dB/oct), −2 dB at 400 Hz, +1.5 dB at 2.5 kHz, high cut 10 kHz |
+| Bass | Low cut 35 Hz (24 dB/oct), +2 dB at 90 Hz, −2.5 dB at 250 Hz, +1.5 dB at 900 Hz, high cut 6 kHz |
+
+- **The graphic:** each strip draws the EQ curve from LUNA Channel's band controls.
+  - **Drag:** drag a numbered dot for frequency and gain; Shift-drag sets Q, and cuts move in
+    frequency only. A drag is one undo step.
+  - **Open:** double-click the graph to open LUNA Channel.
+  - **Follows LUNA:** edits made in LUNA Channel's own window redraw it.
+- **Switching tiers:** LUNA Channel stays in its slot when you switch tiers, so your EQ edits
+  carry over. The starting EQ goes on again only when the EQ insert is new or the instrument
+  changes.
+- **Older tracks:** a track built before the EQ still shows its tier, with **+ LUNA EQ** to add it.
+- **Level matching:** the EQ moves the level by a dB or so, the same in every tier. Level
+  matching between tiers holds, but each tier now sits that much off the dry track.
 
 ## Layout
 Every track in the session is a channel strip, so the window works as a small mixer:
@@ -131,7 +153,7 @@ test compares the gear, not the settings.
 
 ## Develop
 ```sh
-npm install && npm test          # 30 tests on Luna.MockEngine
+npm install && npm test          # 34 tests on Luna.MockEngine
 npx ua-builder serve             # http://localhost:8790/ against a running LUNA
 npx ua-builder install           # link into LUNA: Add Ons > Windows > Good Better Best
 npx ua-builder pack              # .lunaaddon for Universe
