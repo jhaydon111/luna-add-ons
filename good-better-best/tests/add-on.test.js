@@ -213,8 +213,9 @@ describe('macros', () => {
     await logic.setMacro(session, vox, 'squeeze', 1);
     await engine.settled();
     const ctx = logic.macroContext(session, vox);
-    expect(ctx.slots.uaudio_ua_1176.controls.byId('input').normalized.value).toBeCloseTo(0.8);
-    expect(ctx.slots['uaudio_teletronix_la-2a_tc'].controls.byId('peak_reduct').normalized.value).toBeCloseTo(0.6);
+    const want = (plugin, param) => logic.macroTargets(ctx.tier, 'squeeze', 1).find((t) => t.plugin === plugin && t.param === param).value;
+    expect(ctx.slots.uaudio_ua_1176.controls.byId('input').normalized.value).toBeCloseTo(want('uaudio_ua_1176', 'input'));
+    expect(ctx.slots['uaudio_teletronix_la-2a_tc'].controls.byId('peak_reduct').normalized.value).toBeCloseTo(want('uaudio_teletronix_la-2a_tc', 'peak_reduct'));
     expect(logic.macroValue(session, vox, 'squeeze')).toBeCloseTo(1);
     expect(logic.macroWord(logic.macrosOf('vocal')[1], 1)).toBe('Slammed');
   });
@@ -279,6 +280,26 @@ describe('selection', () => {
     await logic.setMacro(session, vox, 'space', 0.6);
     await engine.settled();
     expect(session.context.selectionTracks.value).toEqual([gtr.id]);
+  });
+});
+
+describe('mapping bends', () => {
+  it('a mapping with a midpoint passes through it at 50 % and stays straight without one', () => {
+    expect(logic.mapValue({ lo: 0.2, hi: 0.6 }, 0.5)).toBeCloseTo(0.4);
+    const bent = { lo: 0.2, hi: 0.3, mid: 0.15 };
+    expect(logic.mapValue(bent, 0)).toBeCloseTo(0.2);
+    expect(logic.mapValue(bent, 0.5)).toBeCloseTo(0.15);
+    expect(logic.mapValue(bent, 0.75)).toBeCloseTo(0.225);
+    expect(logic.mapValue(bent, 1)).toBeCloseTo(0.3);
+  });
+
+  it('every readout mapping can be read back (it moves and does not bend)', () => {
+    for (const inst of logic.INSTRUMENTS) for (const tier of inst.tiers) for (const [key, maps] of Object.entries(tier.macros)) {
+      const r = maps[0];
+      if (r.send) continue;
+      expect(r.hi, `${inst.key} ${tier.key} ${key}`).not.toBe(r.lo);
+      expect(r.mid, `${inst.key} ${tier.key} ${key}`).toBeUndefined();
+    }
   });
 });
 

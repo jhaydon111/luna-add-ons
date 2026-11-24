@@ -48,10 +48,16 @@ const EXPLORE = 'UAD Explore FREE';
 const SPARK = 'UAD Spark';
 
 // A macro mapping: move `param` of the stage running `plugin` from `lo` to `hi` (normalized) as
-// the macro goes 0 -> 1. The first mapping of each macro is its readout: the knob reads its
-// position back from it, so it follows undo and edits made in the plug-in window. Ranges come
-// from sweeping each parameter in LUNA 3.1.2 (2026-11-23); output trims roughly compensate drive.
-const M = (stage, param, lo, hi) => ({ plugin: stage.plugin, param, lo, hi });
+// the macro goes 0 -> 1, optionally bending through `mid` at 50 %. The first mapping of each macro
+// is its readout: the knob reads its position back from it, so it follows undo and edits made in
+// the plug-in window.
+//
+// Drive and Squeeze were tuned by measurement in LUNA 3.1.2 on 2026-11-23, not by ear, on a vocal,
+// a DI guitar and a bass at recording level (about -20 dBFS RMS). Squeeze runs from light to heavy
+// gain reduction (about 0.1 to 0.6 of a pinned needle on the plug-ins' own meters), and the output
+// trims hold each tier within about 1 dB of the dry track across both knobs, so A/B and the blind
+// test compare tone, not loudness. Weight and Space were not tuned.
+const M = (stage, param, lo, hi, mid) => ({ plugin: stage.plugin, param, lo, hi, ...(mid === undefined ? {} : { mid }) });
 const SEND = { send: true };          // the Space macro's send level (see spaceDb)
 const F = (stage, param, value) => ({ plugin: stage.plugin, param, value });
 
@@ -63,8 +69,6 @@ const MACROS = {
   gain: { key: 'drive', label: 'Gain', words: ['Clean', 'Edge', 'Crunch', 'Roar'] },
 };
 
-const VOCAL_SQUEEZE = (comp) => [M(comp, 'input', 0.35, 0.8), M(comp, 'output', 0.7, 0.55), M(P.silver, 'peak_reduct', 0.15, 0.6), M(P.silver, 'gain', 0.3, 0.42)];
-const LA3A_SQUEEZE = [M(P.la3a, 'peak_reduction', 0.2, 0.65), M(P.la3a, 'gain', 0.5, 0.58)];
 
 const INSTRUMENTS = [
   {
@@ -75,21 +79,21 @@ const INSTRUMENTS = [
     tiers: [
       { key: 'good', label: 'Good', source: EXPLORE, chain: [P.n610a, P.n1176, P.la2a], verb: P.purePlate,
         macros: {
-          drive: [M(P.n610a, 'level', 0.38, 0.72), M(P.n610a, 'output', 0.55, 0.32)],
-          squeeze: [M(P.n1176, 'input', 0.35, 0.8), M(P.n1176, 'output', 0.7, 0.55), M(P.la2a, 'peak_reduct', 0.15, 0.6), M(P.la2a, 'gain', 0.3, 0.42)],
+          drive: [M(P.n610a, 'level', 0.38, 0.72), M(P.n610a, 'output', 0.288, 0)],
+          squeeze: [M(P.n1176, 'input', 0.154, 0.629), M(P.n1176, 'output', 0.765, 0.607), M(P.la2a, 'peak_reduct', 0.092, 0.408), M(P.la2a, 'gain', 0.213, 0.254, 0.192)],
           space: [SEND],
         } },
       { key: 'better', label: 'Better', source: SPARK, chain: [P.neve, P.revA, P.silver], verb: P.emt140,
         macros: {
-          drive: [M(P.neve, 'output', 0.55, 0.42), M(P.neve, 'line_gain', 0.43, 0.75)],   // readout first: line_gain is stepped
-          squeeze: VOCAL_SQUEEZE(P.revA),
+          drive: [M(P.neve, 'output', 0.112, 0.308), M(P.neve, 'line_gain', 0.43, 0.75)],   // readout first: line_gain is stepped
+          squeeze: [M(P.revA, 'input', 0.329, 0.65), M(P.revA, 'output', 0.707, 0.6), M(P.silver, 'peak_reduct', 0.181, 0.421), M(P.silver, 'gain', 0.234, 0.303, 0.241)],
           space: [SEND],
         } },
       { key: 'best', label: 'Best', source: SPARK, chain: [P.voxbox, P.revE, P.silver], verb: P.lex224,
         fixed: [F(P.voxbox, 'comp_byp', 0)],                     // two compressors follow; VOXBOX's own comp out
         macros: {
-          drive: [M(P.voxbox, 'input', 0.25, 0.65), M(P.voxbox, 'output', 0.55, 0.4), M(P.voxbox, 'hi_peak', 0, 0.35)],
-          squeeze: VOCAL_SQUEEZE(P.revE),
+          drive: [M(P.voxbox, 'input', 0.25, 0.65), M(P.voxbox, 'output', 0.693, 0.061), M(P.voxbox, 'hi_peak', 0, 0.35)],
+          squeeze: [M(P.revE, 'input', 0, 0.508), M(P.revE, 'output', 0.838, 0.648), M(P.silver, 'peak_reduct', 0, 0.303), M(P.silver, 'gain', 0.172, 0.212, 0.166)],
           space: [SEND],
         } },
     ],
@@ -102,21 +106,21 @@ const INSTRUMENTS = [
     tiers: [
       { key: 'good', label: 'Good', source: EXPLORE, chain: [P.showtime, P.n610b, P.n1176], verb: P.purePlate,
         macros: {
-          drive: [M(P.showtime, 'volume', 0.2, 0.85), M(P.showtime, 'output', 0.8, 0.6)],
-          squeeze: [M(P.n1176, 'input', 0.3, 0.75), M(P.n1176, 'output', 0.7, 0.58)],
+          drive: [M(P.showtime, 'volume', 0.2, 0.85), M(P.showtime, 'output', 0.937, 0.932)],
+          squeeze: [M(P.n1176, 'input', 0.014, 0.142), M(P.n1176, 'output', 0.733, 0.701)],
           space: [SEND],
         } },
       { key: 'better', label: 'Better', source: SPARK, chain: [P.dream, P.galaxy, P.la3a], verb: P.emt140,
         fixed: [F(P.galaxy, 'feedback', 0.2)],
         macros: {
-          drive: [M(P.dream, 'volume', 0.25, 0.85), M(P.dream, 'boost_amount', 0, 0.6), M(P.dream, 'output', 0.55, 0.4)],
-          squeeze: LA3A_SQUEEZE,
+          drive: [M(P.dream, 'volume', 0.25, 0.85), M(P.dream, 'boost_amount', 0, 0.6), M(P.dream, 'output', 0.824, 0.756)],
+          squeeze: [M(P.la3a, 'peak_reduction', 0.405, 0.522), M(P.la3a, 'gain', 0.526, 0.612)],
           space: [SEND, M(P.galaxy, 'echo_vol', 0.05, 0.4)],      // more space brings the tape echo up too
         } },
       { key: 'best', label: 'Best', source: SPARK, chain: [P.lion, P.neve, P.la3a], verb: P.capitol,
         macros: {
-          drive: [M(P.lion, 'volume_1', 0.3, 0.95), M(P.lion, 'boost_amount', 0.2, 0.6), M(P.lion, 'output', 0.62, 0.48)],
-          squeeze: LA3A_SQUEEZE,
+          drive: [M(P.lion, 'volume_1', 0.3, 0.95), M(P.lion, 'boost_amount', 0.2, 0.6), M(P.lion, 'output', 0.62, 0.672)],
+          squeeze: [M(P.la3a, 'peak_reduction', 0.389, 0.529), M(P.la3a, 'gain', 0.513, 0.635, 0.561)],
           space: [SEND],
         } },
     ],
@@ -129,21 +133,21 @@ const INSTRUMENTS = [
     tiers: [
       { key: 'good', label: 'Good', source: EXPLORE, chain: [P.century, P.n1176, P.la2a], verb: null,
         macros: {
-          drive: [M(P.century, 'level', 0.45, 0.75), M(P.century, 'output', 0.55, 0.4)],
-          squeeze: [M(P.century, 'compression', 0.2, 0.7), M(P.n1176, 'input', 0.3, 0.7), M(P.n1176, 'output', 0.7, 0.6), M(P.la2a, 'peak_reduct', 0.1, 0.45)],
+          drive: [M(P.century, 'level', 0.45, 0.75), M(P.century, 'output', 0.866, 0.24)],
+          squeeze: [M(P.century, 'compression', 0, 0.6), M(P.n1176, 'input', 0, 0.651), M(P.n1176, 'output', 0.684, 0.592, 0.578), M(P.la2a, 'peak_reduct', 0, 0.367)],
           weight: [M(P.century, 'low_shelf', 0.45, 0.72)],
         } },
       { key: 'better', label: 'Better', source: SPARK, chain: [P.pultec, P.revA, P.silver], verb: null,
         fixed: [F(P.pultec, 'low_freq', 0.5)],                   // 60 cps
         macros: {
-          drive: [M(P.pultec, 'output', 0.5, 0.68), M(P.silver, 'gain', 0.4, 0.32)],
-          squeeze: [M(P.revA, 'input', 0.3, 0.75), M(P.revA, 'output', 0.72, 0.6), M(P.silver, 'peak_reduct', 0.1, 0.5)],
+          drive: [M(P.pultec, 'output', 0.5, 0.68), M(P.silver, 'gain', 0.356, 0.301)],
+          squeeze: [M(P.revA, 'input', 0, 0.715), M(P.revA, 'output', 0.72, 0.593, 0.545), M(P.silver, 'peak_reduct', 0, 0.376)],
           weight: [M(P.pultec, 'lf_boost', 0, 0.6)],
         } },
       { key: 'best', label: 'Best', source: SPARK, chain: [P.neve, P.distressor, P.fatso], verb: null,
         macros: {
-          drive: [M(P.neve, 'output', 0.55, 0.45), M(P.fatso, 'ch1warmth', 0, 0.75), M(P.neve, 'line_gain', 0.43, 0.7)],   // stepped ones after the readout
-          squeeze: [M(P.distressor, 'input', 0.3, 0.7), M(P.distressor, 'output', 0.7, 0.55)],
+          drive: [M(P.neve, 'output', 0.381, 0.621), M(P.fatso, 'ch1warmth', 0, 0.75), M(P.neve, 'line_gain', 0.43, 0.7)],   // stepped ones after the readout
+          squeeze: [M(P.distressor, 'input', 0.196, 0.475), M(P.distressor, 'output', 0.7, 0.63, 0.605)],
           weight: [M(P.neve, 'lf_gain', 0.45, 0.72)],
         } },
     ],
@@ -153,6 +157,22 @@ const INSTRUMENTS = [
 const DEFAULT_MACRO = 0.5;
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+// A plug-in control whose type has not loaded yet gets a bare 0 or 1 sent as a whole number, which
+// LUNA refuses (uasrv.invalid_type, seen 2026-11-23); 0.0001 off the end is inaudible.
+// A mapping is a straight line lo -> hi, or two lines through `mid` at 50 % (makeup gain that has
+// to bend because compression does not grow evenly with the knob).
+const mapValue = (m, t) => {
+  const x = clamp01(t);
+  if (m.mid === undefined) return lerp(m.lo, m.hi, x);
+  return x <= 0.5 ? lerp(m.lo, m.mid, x * 2) : lerp(m.mid, m.hi, x * 2 - 1);
+};
+const mapInverse = (m, n) => {
+  if (m.mid === undefined) return m.hi !== m.lo ? clamp01((n - m.lo) / (m.hi - m.lo)) : undefined;
+  const a = m.mid !== m.lo ? (n - m.lo) / (m.mid - m.lo) / 2 : undefined;
+  if (a !== undefined && a >= 0 && a <= 0.5) return a;
+  return m.hi !== m.mid ? clamp01(0.5 + (n - m.mid) / (m.hi - m.mid) / 2) : undefined;
+};
+const notWhole = (v) => (v === 0 ? 1e-4 : v === 1 ? 1 - 1e-4 : v);
 // Space: the send level, -30 dB at 0.02 up to -6 dB at 1; fully off at 0.
 const spaceDb = (v) => (v <= 0.01 ? -144 : lerp(-30, -6, v));
 const spaceFromDb = (db) => (db <= -100 ? 0 : clamp01((db + 30) / 24));
@@ -201,6 +221,7 @@ const AddOnLogic = {
   tierOfInstrument,
   DEFAULT_MACRO,
   spaceDb,
+  mapValue,
   GR_METERS,
 
   /** The instrument's three macros: [{ key, label, words }]. */
@@ -217,7 +238,7 @@ const AddOnLogic = {
 
   /** What a macro would write at `v`: [{ plugin, param, value }] and, for Space, { send: dB }. */
   macroTargets(tier, key, v) {
-    return (tier.macros[key] ?? []).map((m) => (m.send ? { send: spaceDb(v) } : { plugin: m.plugin, param: m.param, value: lerp(m.lo, m.hi, clamp01(v)) }));
+    return (tier.macros[key] ?? []).map((m) => (m.send ? { send: spaceDb(v) } : { plugin: m.plugin, param: m.param, value: mapValue(m, v) }));
   },
 
   /** Load the controls of the track's chain inserts and sends, before reading or writing macros. */
@@ -257,7 +278,8 @@ const AddOnLogic = {
       return typeof db === 'number' ? spaceFromDb(db) : DEFAULT_MACRO;
     }
     const n = ctx.slots[m.plugin]?.controls.byId(m.param)?.normalized.value;
-    return typeof n === 'number' && m.hi !== m.lo ? clamp01((n - m.lo) / (m.hi - m.lo)) : DEFAULT_MACRO;
+    const v = typeof n === 'number' ? mapInverse(m, n) : undefined;
+    return v ?? DEFAULT_MACRO;
   },
 
   /** Every macro of the track's instrument: { key: value }. */
@@ -274,7 +296,7 @@ const AddOnLogic = {
     for (const t of AddOnLogic.macroTargets(ctx.tier, key, v)) {
       if (t.send !== undefined) { if (ctx.send && ctx.send.gain.real.value !== t.send) writes.push(ctx.send.gain.real.set(t.send)); continue; }
       const c = ctx.slots[t.plugin]?.controls.byId(t.param);
-      if (c && c.normalized.value !== t.value) writes.push(c.normalized.set(t.value));
+      if (c && c.normalized.value !== t.value) writes.push(c.normalized.set(notWhole(t.value)));
     }
     await Promise.all(writes);
   },

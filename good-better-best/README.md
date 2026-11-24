@@ -49,8 +49,17 @@ turn it.
 - **Keys:** double-click resets a knob to 50 %. Arrow keys step 5 % (1 % with Shift), and Shift
   while dragging gives fine control.
 - **Nudge:** on Good with Spark locked, a line names the Better gear, with "Get with Spark".
-- **Ranges:** they come from sweeping each parameter's display in LUNA 3.1.2. They are a
-  starting point, set without listening, and need tuning by ear.
+- **Tuning:** Drive and Squeeze were tuned by measurement, not by ear, in LUNA 3.1.2. The
+  sources were a vocal, a DI guitar and a bass at recording level (about −20 dBFS RMS).
+  - **Squeeze:** runs from light to heavy gain reduction (about 0.1 to 0.6 of a pinned needle on
+    the compressors' own meters). Good guitar keeps some compression even at 0, because the amp
+    feeds its 1176 hot.
+  - **Level:** output trims hold every tier within 0.8 dB of the dry track at the points checked
+    (centre, and each knob at 0, 50 and 100 %). The exception is Better bass at the Drive
+    extremes (±1.4 dB). So A/B and the blind test compare tone, not loudness.
+  - **Bend:** a makeup gain can bend through a midpoint at 50 % (`M(..., lo, hi, mid)`), because
+    compression doesn't grow evenly with the knob.
+  - **Not tuned:** Weight and Space, and whether each tier sounds right, which needs ears.
 
 ## Live rings
 Each knob has an inner ring that moves while the song plays and falls to rest when it stops.
@@ -101,16 +110,15 @@ test compares the gear, not the settings.
   overlapping tier swaps on one track left LUNA unable to load new plug-ins until a restart.
 
 ## Not done yet
-- **Tuning by ear:** the macro ranges were set from the parameters' display readings without
-  listening. Gain matching across tiers is approximate, and louder tends to win a blind test. On
-  a mastered-level vocal, the 1176 already pins at Squeeze 0, so its input range is too hot for
-  hot sources.
+- **Listening pass:** the ranges are measured, not heard. Tone choices (how much Drive colours,
+  whether Best sounds best) still need ears. Sources much hotter than recording level (a
+  mastered vocal) will compress harder than intended.
 - **Locked-tier demo:** there's no bundled before/after audio yet, so a free user can't hear a
   locked tier before subscribing.
 
 ## Develop
 ```sh
-npm install && npm test          # 28 tests on Luna.MockEngine
+npm install && npm test          # 30 tests on Luna.MockEngine
 npx ua-builder serve             # http://localhost:8790/ against a running LUNA
 npx ua-builder install           # link into LUNA: Add Ons > Windows > Good Better Best
 npx ua-builder pack              # .lunaaddon for Universe
