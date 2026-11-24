@@ -29,6 +29,20 @@ unlocked; otherwise it takes the old chain off.
 
 The plug-in ids were read from LUNA 3.1.2's catalog.
 
+## Layout
+Every track in the session is a channel strip, so the window works as a small mixer:
+- **Top:** the track's instrument, then a drop-down for Good, Better, Best or Off. Locked tiers
+  are marked with a lock, and picking one names the missing plug-ins with "Get with Spark".
+- **Under the drop-down:** the chain as chips (the reverb send marked ↪) and the three macro
+  knobs, stacked. The chips a knob drives light up while you hover or turn it.
+- **A/B and Blind.**
+- **Bottom:** a meter bridge with one gain-reduction meter per compressor, hanging from the top
+  in orange like a console's; the track's fader (one undo step per drag, double-click for 0 dB);
+  a level meter with a held peak; the dB readout; mute and solo.
+
+A track with no instrument still gets a fader, meter, mute and solo. Strips line up their
+faders at the bottom, and the window scrolls sideways for big sessions.
+
 ## Macros
 Each track with a tier on gets three knobs. Drive and Squeeze are on every instrument (guitar
 calls Drive "Gain"). Vocal and guitar get Space; bass gets Weight. One knob moves several real
@@ -48,7 +62,6 @@ turn it.
   so it follows undo and edits made in the plug-in window.
 - **Keys:** double-click resets a knob to 50 %. Arrow keys step 5 % (1 % with Shift), and Shift
   while dragging gives fine control.
-- **Nudge:** on Good with Spark locked, a line names the Better gear, with "Get with Spark".
 - **Tuning:** Drive and Squeeze were tuned by measurement, not by ear, in LUNA 3.1.2. The
   sources were a vocal, a DI guitar and a bass at recording level (about −20 dBFS RMS).
   - **Squeeze:** runs from light to heavy gain reduction (about 0.1 to 0.6 of a pinned needle on
@@ -80,7 +93,7 @@ The compressors' meters are the plug-ins' own (`<slot>/meters/<id>`), measured i
 
 ## Blind test
 **Blind** deals the dry track and every tier you have to letters at random (A, B, C, D), and hides
-the tier switch, knobs and chain. Click letters to hear each one, then **Keep** your favourite to
+the tier drop-down, knobs and chain; the fader stays. Click letters to hear each one, then **Keep** your favourite to
 see which was which. The pick stays on the track. Knob positions carry over between tiers, so the
 test compares the gear, not the settings.
 - **On Explore FREE:** the test is Dry vs Good, and the results say Better and Best join the test

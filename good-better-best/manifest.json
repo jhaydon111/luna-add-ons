@@ -2,7 +2,7 @@
     "package_name": "Good Better Best",
     "id": "com.jhaydon.good_better_best",
     "title": "Good Better Best",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "manufacturer": "JC Haydon",
     "description": "One switch per track builds a channel chain: Good on UAD Explore FREE plug-ins, Better and Best on UAD Spark plug-ins. A/B the chain and hear what each tier adds.",
     "categories": ["Mixing & Mastering"],
@@ -13,6 +13,6 @@
     "target": "window",
     "floating": true,
     "show_with_session": true,
-    "width": 600,
-    "height": 680
+    "width": 880,
+    "height": 760
 }
